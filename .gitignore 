@@ -1,0 +1,61 @@
+# Remove .DS_Store from git if it's already tracked
+git rm --cached .DS_Store
+
+# Create the .gitignore (copy the content from the artifact)
+# Then add it
+git add .gitignore
+```
+
+**You should also have `.gitignore` files in subdirectories:**
+
+**`frontend/.gitignore`:**
+```
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build output
+dist/
+dist-ssr/
+*.local
+
+# Vite
+.vite/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# OS
+.DS_Store
+```
+
+**`java-service/.gitignore`:**
+```
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+dependency-reduced-pom.xml
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+
+# Application
+application-local.yml

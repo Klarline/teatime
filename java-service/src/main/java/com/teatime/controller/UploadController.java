@@ -17,6 +17,11 @@ import java.util.UUID;
 @RequestMapping("/api/upload")
 public class UploadController {
 
+  /**
+   * Upload blog image
+   * POST /api/upload/blog
+   * Form Data: file (MultipartFile)
+   */
   @PostMapping("/blog")
   public Result uploadImage(@RequestParam("file") MultipartFile image) {
     try {
@@ -34,6 +39,10 @@ public class UploadController {
     }
   }
 
+  /**
+   * Delete blog image
+   * GET /api/upload/blog/delete?name={filename}
+   */
   @GetMapping("/blog/delete")
   public Result deleteBlogImg(@RequestParam("name") String filename) {
     File file = new File(SystemConstants.IMAGE_UPLOAD_DIR, filename);

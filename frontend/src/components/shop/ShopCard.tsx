@@ -1,6 +1,6 @@
 import { Star, MapPin } from 'lucide-react';
 import type { Shop } from '@/types';
-import { parseImages, formatRating, formatDistance } from '@/utils/formatters';
+import { parseImages, formatRating, formatDistance, formatPrice } from '@/utils/formatters';
 
 interface ShopCardProps {
 	shop: Shop;
@@ -45,7 +45,7 @@ export const ShopCard = ({ shop, onClick }: ShopCardProps) => {
 
 				<div className="flex gap-2 mt-3">
 					<span className="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600">
-						Avg ${shop.avgPrice}
+						Avg {formatPrice(shop.avgPrice)}
 					</span>
 					<span className="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600">
 						{shop.comments} reviews

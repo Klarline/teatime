@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BlogCard } from '@/components/blog/BlogCard';
 import { blogApi } from '@/api/blog.api';
-import type { Blog } from '@/api/types';
+import type { Blog } from '@/types';
 
 export const BlogFeed = () => {
   const navigate = useNavigate();

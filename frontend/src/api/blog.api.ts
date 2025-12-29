@@ -1,5 +1,5 @@
 import api from './index';
-import type { ApiResponse, Blog, User, PageResult } from './types';
+import type { ApiResponse, Blog, User, PageResult } from '../types';
 
 export const blogApi = {
   // Create blog post

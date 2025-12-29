@@ -24,10 +24,10 @@ public class ShopController {
   public IShopService shopService;
 
   /**
-   * Query shop information by id
-   *
-   * @param id Shop id
-   * @return Shop information
+   * Get shop information by ID
+   * Get /api/shop/{id}
+   * <p>
+   * Returns: { "id": 1, "name": "Tea Time", ... }
    */
   @GetMapping("/{id}")
   public Result queryShopById(@PathVariable("id") Long id) {
@@ -36,9 +36,7 @@ public class ShopController {
 
   /**
    * Save new shop information
-   *
-   * @param shop Shop data
-   * @return Shop id
+   * POST /api/shop
    */
   @PostMapping
   public Result saveShop(@RequestBody Shop shop) {
@@ -48,21 +46,17 @@ public class ShopController {
 
   /**
    * Update existing shop information
-   *
-   * @param shop Shop data
-   * @return Result of the update operation
+   * PUT /api/shop
    */
   @PutMapping
   public Result updateShop(@RequestBody Shop shop) {
     return shopService.update(shop);
   }
 
+
   /**
-   * Query shops by type with pagination
-   *
-   * @param typeId  Shop type id
-   * @param current Page number
-   * @return List of shops
+   * Query shops by type with optional location sorting
+   * GET /api/shop/of/type?typeId=1&current=1&x=123.45&y=67.89
    */
   @GetMapping("/of/type")
   public Result queryShopByType(
@@ -73,13 +67,10 @@ public class ShopController {
   ) {
     return shopService.queryShopByType(typeId, current, x, y);
   }
-
+  
   /**
    * Query shops by name with pagination
-   *
-   * @param name    Shop name
-   * @param current Page number
-   * @return List of shops
+   * GET /api/shop/of/name?name=Tea&current=1
    */
   @GetMapping("/of/name")
   public Result queryShopByName(

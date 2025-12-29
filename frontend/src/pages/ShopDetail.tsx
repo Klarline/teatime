@@ -1,3 +1,4 @@
+import { ReviewSection } from '@/components/shop/ReviewSection';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -8,7 +9,7 @@ import { shopApi } from '@/api/shop.api';
 import { couponApi } from '@/api/coupon.api';
 import { parseImages, formatPrice, formatRating } from '@/utils/formatters';
 import { useAuthStore } from '@/store/authStore';
-import type { Shop, Coupon } from '@/api/types';
+import type { Shop, Coupon } from '@/types';
 
 export const ShopDetail = () => {
 	const { id } = useParams<{ id: string }>();
@@ -314,6 +315,8 @@ export const ShopDetail = () => {
 					</div>
 				)}
 
+				{/* Reviews Section */}
+				<ReviewSection shopId={parseInt(id!)} />
 				
 			</div>
 		</div>

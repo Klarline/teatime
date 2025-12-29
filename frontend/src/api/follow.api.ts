@@ -1,5 +1,5 @@
 import api from './index';
-import type { ApiResponse, User } from './types';
+import type { ApiResponse, User } from '../types';
 
 export const followApi = {
   // Follow/unfollow user

@@ -39,6 +39,15 @@ application-local.yaml
 application-dev.yml
 application-dev.yaml
 
+### Maven ###
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+dependency-reduced-pom.xml
+pom.xml.next
+release.properties
+
 ### Logs ###
 *.log
 logs/

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, MapPin } from 'lucide-react';
+import { AIRecommendations } from '@/components/ai/AIRecommendations';
 import { ShopCard } from '@/components/shop/ShopCard';
 import { shopApi } from '@/api/shop.api';
 import { useGeolocation, useDebounce } from '@/hooks';
-import type { Shop, ShopType } from '@/api/types';
+import type { Shop, ShopType } from '@/types';
 
 export const Explore = () => {
 	const navigate = useNavigate();
@@ -198,13 +199,18 @@ export const Explore = () => {
 					</div>
 				)}
 
+				{/* AI Recommendations */}
+				<div className="mb-8">
+					<AIRecommendations />
+				</div>
+
 				{/* Category Tabs */}
 				<div className="flex gap-4 overflow-x-auto no-scrollbar pb-1">
 					<button
 						onClick={() => handleTabClick(0)}
 						className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${activeTab === 0
-								? 'bg-primary-500 text-white'
-								: 'text-gray-600 bg-gray-100'
+							? 'bg-primary-500 text-white'
+							: 'text-gray-600 bg-gray-100'
 							}`}
 					>
 						All
@@ -214,8 +220,8 @@ export const Explore = () => {
 							key={type.id}
 							onClick={() => handleTabClick(type.id)}
 							className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${activeTab === type.id
-									? 'bg-primary-500 text-white'
-									: 'text-gray-600 bg-gray-100'
+								? 'bg-primary-500 text-white'
+								: 'text-gray-600 bg-gray-100'
 								}`}
 						>
 							{type.icon} {type.name}

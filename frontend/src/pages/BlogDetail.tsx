@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { blogApi } from '@/api/blog.api';
 import { parseImages, formatRelativeTime } from '@/utils/formatters';
-import type { Blog, User } from '@/api/types';
+import type { Blog, User } from '@/types';
 
 export const BlogDetail = () => {
   const { id } = useParams<{ id: string }>();

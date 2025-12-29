@@ -6,7 +6,7 @@ import { blogApi } from '@/api/blog.api';
 import { shopApi } from '@/api/shop.api';
 import { uploadApi } from '@/api/upload.api';
 import { stringifyImages } from '@/utils/formatters';
-import type { Shop } from '@/api/types';
+import type { Shop } from '@/types';
 
 export const CreatePost = () => {
 	const navigate = useNavigate();

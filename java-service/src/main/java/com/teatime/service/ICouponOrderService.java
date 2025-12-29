@@ -12,7 +12,18 @@ import com.teatime.entity.CouponOrder;
  */
 public interface ICouponOrderService extends IService<CouponOrder> {
 
+  /**
+   * Flash sale coupon
+   *
+   * @param couponId Coupon ID
+   * @return Result
+   */
   Result flashSaleCoupon(Long couponId);
 
+  /**
+   * Create coupon order
+   *
+   * @param couponId Coupon ID
+   */
   void createCouponOrder(CouponOrder couponId);
 }

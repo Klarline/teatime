@@ -25,16 +25,29 @@ public class BlogController {
   @Resource
   private IBlogService blogService;
 
+  /**
+   * Create a new blog post.
+   * POST /api/blog
+   * Body: { "content": "My first blog post", "images": [...] }
+   */
   @PostMapping
   public Result saveBlog(@RequestBody Blog blog) {
     return blogService.saveBlog(blog);
   }
 
+  /**
+   * Like a blog post
+   * PUT /api/blog/like/{id}
+   */
   @PutMapping("/like/{id}")
   public Result likeBlog(@PathVariable("id") Long id) {
     return blogService.likeBlog(id);
   }
 
+  /**
+   * Get blogs of the logged-in user
+   * GET /api/blog/of/me?current=1
+   */
   @GetMapping("/of/me")
   public Result queryMyBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {
     // get logged-in user
@@ -47,21 +60,37 @@ public class BlogController {
     return Result.ok(records);
   }
 
+  /**
+   * Get hot blogs
+   * GET /api/blog/hot?current=1
+   */
   @GetMapping("/hot")
   public Result queryHotBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {
     return blogService.queryHotBlog(current);
   }
 
+  /**
+   * Get blog details by ID
+   * GET /api/blog/{id}
+   */
   @GetMapping("/{id}")
   public Result queryBlogById(@PathVariable("id") Long id) {
     return blogService.queryBlogById(id);
   }
 
+  /**
+   * Get users who liked a blog post
+   * GET /api/blog/likes/{id}
+   */
   @GetMapping("/likes/{id}")
   public Result queryBlogLikes(@PathVariable("id") Long id) {
     return blogService.queryBlogLikes(id);
   }
 
+  /**
+   * Get blogs by a specific user
+   * GET /api/blog/of/user?id=1&current=1
+   */
   @GetMapping
   public Result queryBlogByUserId(
       @RequestParam("id") Long userId,

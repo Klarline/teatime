@@ -9,7 +9,7 @@ import { blogApi } from '@/api/blog.api';
 import { authApi } from '@/api/auth.api';
 import { followApi } from '@/api/follow.api';
 import { parseImages } from '@/utils/formatters';
-import type { Blog, User } from '@/api/types';
+import type { Blog, User } from '@/types';
 
 export const Profile = () => {
 	const { id } = useParams<{ id: string }>();
@@ -311,7 +311,8 @@ export const Profile = () => {
 				</h2>
 
 				<p className="text-gray-500 text-sm mb-4 truncate">
-					{isOwnProfile ? 'Tea enthusiast 🍵 | Exploring flavors 🌍' : `Joined ${new Date(profileUser.createTime).getFullYear()}`}
+					{isOwnProfile ? 'Tea enthusiast 🍵 | Exploring flavors 🌍' 
+					: `Joined ${profileUser.createTime ? new Date(profileUser.createTime).getFullYear() : 'recently'}`}
 				</p>
 
 				{/* Stats */}

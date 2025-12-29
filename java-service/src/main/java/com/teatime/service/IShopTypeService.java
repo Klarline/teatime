@@ -11,5 +11,10 @@ import com.teatime.entity.ShopType;
  */
 public interface IShopTypeService extends IService<ShopType> {
 
+  /**
+   * Retrieve the list of shop types
+   *
+   * @return Result containing the list of shop types
+   */
   Result queryTypeList();
 }

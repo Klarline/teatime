@@ -23,6 +23,12 @@ public class CouponOrderController {
     this.couponOrderService = couponOrderService;
   }
 
+  /**
+   * Flash sale coupon
+   * POST /api/coupon-order/flash-sale/{id}
+   * <p>
+   * Returns: { success: true, message: "Coupon claimed successfully" }
+   */
   @PostMapping("/flash-sale/{id}")
   public Result flashSaleCoupon(@PathVariable("id") Long couponId) {
     return couponOrderService.flashSaleCoupon(couponId);

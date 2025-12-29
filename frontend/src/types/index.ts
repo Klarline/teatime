@@ -1,3 +1,24 @@
+// ============================================
+// API Response Wrappers
+// ============================================
+
+export interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  errorMsg?: string;
+}
+
+export interface PageResult<T> {
+  records: T[];
+  total: number;
+  pages: number;
+  current: number;
+}
+
+// ============================================
+// Domain Types
+// ============================================
+
 export interface User {
   id: number;
   nickName: string;
@@ -23,6 +44,13 @@ export interface Shop {
   distance?: number;
 }
 
+export interface ShopType {
+  id: number;
+  name: string;
+  icon: string;
+  sort: number;
+}
+
 export interface Blog {
   id: number;
   shopId?: number;
@@ -33,16 +61,9 @@ export interface Blog {
   liked: number;
   comments: number;
   createTime: string;
-  name: string;      // Author name
-  icon: string;      // Author icon
-  isLike: boolean;   // Current user liked?
-}
-
-export interface ShopType {
-  id: number;
   name: string;
   icon: string;
-  sort: number;
+  isLike: boolean;
 }
 
 export interface Coupon {
@@ -58,4 +79,27 @@ export interface Coupon {
   stock: number;
   beginTime: string;
   endTime: string;
+}
+
+export interface Review {
+  id: number;
+  shopId: number;
+  userId: number;
+  rating: number;
+  content: string;
+  createTime: string;
+  updateTime: string;
+  nickName?: string;
+  icon?: string;
+}
+
+export interface ReviewStats {
+  avgRating: number;
+  reviewCount: number;
+}
+
+export interface CreateReviewRequest {
+  shopId: number;
+  rating: number;
+  content: string;
 }

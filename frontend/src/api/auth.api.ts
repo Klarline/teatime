@@ -1,6 +1,5 @@
-// src/api/auth.api.ts
 import api from './index';
-import type { ApiResponse, User } from './types';
+import type { ApiResponse, User } from '../types';
 
 export const authApi = {
   // Send verification code

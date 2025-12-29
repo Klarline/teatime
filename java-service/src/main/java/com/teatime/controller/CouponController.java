@@ -21,10 +21,8 @@ public class CouponController {
   private ICouponService couponService;
 
   /**
-   * New coupon
-   *
-   * @param coupon coupon information
-   * @return coupon id
+   * Add a new coupon
+   * POST /api/coupon
    */
   @PostMapping
   public Result addCoupon(@RequestBody Coupon coupon) {
@@ -33,10 +31,8 @@ public class CouponController {
   }
 
   /**
-   * New flash sale coupon
-   *
-   * @param coupon coupon information, including flash sale information
-   * @return coupon id
+   * Add a flash sale coupon
+   * POST /api/coupon/flash-sale
    */
   @PostMapping("/flash-sale")
   public Result addFlashSaleCoupon(@RequestBody Coupon coupon) {
@@ -45,10 +41,8 @@ public class CouponController {
   }
 
   /**
-   * Query coupons of shop
-   *
-   * @param shopId shop id
-   * @return coupon list
+   * Get coupons for a specific shop
+   * GET /api/coupon/list/{shopId}
    */
   @GetMapping("/list/{shopId}")
   public Result queryCouponOfShop(@PathVariable("shopId") Long shopId) {

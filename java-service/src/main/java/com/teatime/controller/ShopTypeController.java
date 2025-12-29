@@ -20,6 +20,10 @@ public class ShopTypeController {
   @Resource
   private IShopTypeService typeService;
 
+  /**
+   * Get list of shop types
+   * GET /api/shop-type/list
+   */
   @GetMapping("/list")
   public Result queryTypeList() {
     return typeService.queryTypeList();

@@ -9,18 +9,23 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teatime.dto.Result;
 import com.teatime.dto.UserDTO;
+import com.teatime.dto.ai.ReviewDocument;
 import com.teatime.entity.Blog;
 import com.teatime.entity.Follow;
+import com.teatime.entity.Shop;
 import com.teatime.entity.User;
 import com.teatime.mapper.BlogMapper;
+import com.teatime.service.IAIService;
 import com.teatime.service.IBlogService;
 import com.teatime.service.IFollowService;
+import com.teatime.service.IShopService;
 import com.teatime.service.IUserService;
 import com.teatime.utils.SystemConstants;
 import com.teatime.utils.UserHolder;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import javax.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -37,6 +42,12 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
   private final IUserService userService;
   private final StringRedisTemplate stringRedisTemplate;
   private final IFollowService followService;
+
+  @Resource
+  private IShopService shopService;
+
+  @Resource
+  private IAIService aiService;
 
   @Override
   public Result queryHotBlog(Integer current) {
@@ -132,11 +143,32 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     // get logged-in user
     UserDTO user = UserHolder.getUser();
     blog.setUserId(user.getId());
-    // save blog
+    // save blog to database
     boolean isSuccess = save(blog);
     if (!isSuccess) {
       return Result.fail("Failed to publish blog");
     }
+
+    // async ingestion to AI service
+    try {
+      ReviewDocument review = new ReviewDocument();
+      review.setReviewId(blog.getId());
+      review.setShopId(blog.getShopId());
+      review.setContent(blog.getContent());
+      review.setTitle(blog.getTitle());
+
+      // get shop name and username
+      Shop shop = shopService.getById(blog.getShopId());
+      if (shop != null) {
+        review.setShopName(shop.getName());
+      }
+      review.setUserName(user.getNickName());
+
+      aiService.ingestReview(review);
+    } catch (Exception e) {
+      log.error("Failed to ingest review to AI service", e);
+    }
+
     // query followers of the author
     List<Follow> follows = followService.query().eq("followed_user_id", user.getId()).list();
 

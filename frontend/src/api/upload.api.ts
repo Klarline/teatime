@@ -1,5 +1,5 @@
 import api from './index';
-import type { ApiResponse } from './types';
+import type { ApiResponse } from '../types';
 
 export const uploadApi = {
   // Upload blog image

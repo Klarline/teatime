@@ -1,0 +1,48 @@
+# ============================================
+# ROOT LEVEL - Common patterns across all services
+# ============================================
+
+# Environment files with secrets
+.env
+.env.local
+.env.*.local
+
+# Logs directory
+logs/
+*.log
+
+# IDE - IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# IDE - VS Code
+.vscode/
+*.code-workspace
+
+# IDE - Eclipse
+.settings/
+.classpath
+.project
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+
+# Backup files
+*.orig

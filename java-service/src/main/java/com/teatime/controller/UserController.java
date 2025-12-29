@@ -34,6 +34,7 @@ public class UserController {
 
   /**
    * Send verification code to specified phone number
+   * POST /api/user/code
    */
   @PostMapping("/code")
   public Result sendCode(@RequestParam("phone") String phone, HttpSession session) {
@@ -43,8 +44,7 @@ public class UserController {
 
   /**
    * Login functionality
-   *
-   * @param loginForm Login form data including phone number and verification code
+   * POST /api/user/login
    */
   @PostMapping("/login")
   public Result login(@RequestBody LoginFormDTO loginForm, HttpSession session) {
@@ -52,11 +52,19 @@ public class UserController {
     return userService.login(loginForm, session);
   }
 
+  /**
+   * Logout functionality
+   * POST /api/user/logout
+   */
   @PostMapping("/logout")
   public Result logout() {
     return Result.fail("Unimplemented");
   }
 
+  /**
+   * Get current logged-in user information
+   * GET /api/user/me
+   */
   @GetMapping("/me")
   public Result me() {
     // get current logged-in user
@@ -64,6 +72,10 @@ public class UserController {
     return Result.ok(user);
   }
 
+  /**
+   * Get user info by user ID
+   * GET /api/user/info/{id}
+   */
   @GetMapping("/info/{id}")
   public Result info(@PathVariable("id") Long userId) {
     UserInfo info = userInfoService.getById(userId);
@@ -76,6 +88,10 @@ public class UserController {
     return Result.ok(info);
   }
 
+  /**
+   * Get user by ID
+   * GET /api/user/{id}
+   */
   @GetMapping("/{id}")
   public Result queryUserById(@PathVariable("id") Long userId) {
     User user = userService.getById(userId);
@@ -86,11 +102,19 @@ public class UserController {
     return Result.ok(userDTO);
   }
 
+  /**
+   * User check-in
+   * POST /api/user/checkin
+   */
   @PostMapping("/checkin")
   public Result checkIn() {
     return userService.checkIn();
   }
 
+  /**
+   * Get user check-in count
+   * GET /api/user/checkin/count
+   */
   @GetMapping("/checkin/count")
   public Result checkInCount() {
     return userService.checkInCount();

@@ -7,7 +7,7 @@ import { ShopCard } from '@/components/shop/ShopCard';
 import { shopApi } from '@/api/shop.api';
 import { blogApi } from '@/api/blog.api';
 import { parseImages } from '@/utils/formatters';
-import type { Shop, ShopType, Blog } from '@/api/types';
+import type { Shop, ShopType, Blog } from '@/types';
 
 export const Home = () => {
 	const navigate = useNavigate();

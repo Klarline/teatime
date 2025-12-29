@@ -11,7 +11,18 @@ import com.teatime.entity.Coupon;
  */
 public interface ICouponService extends IService<Coupon> {
 
+  /**
+   * Query coupons available for a specific shop
+   *
+   * @param shopId Shop ID
+   * @return Result with coupon list
+   */
   Result queryCouponOfShop(Long shopId);
 
+  /**
+   * Add a flash sale coupon
+   *
+   * @param coupon Coupon object
+   */
   void addFlashSaleCoupon(Coupon coupon);
 }

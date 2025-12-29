@@ -1,5 +1,5 @@
 import api from './index';
-import type { ApiResponse, Shop, ShopType, PageResult } from './types';
+import type { ApiResponse, Shop, ShopType, PageResult } from '../types';
 
 export const shopApi = {
   // Get shop by ID

@@ -1,5 +1,5 @@
 import api from './index';
-import type { ApiResponse, Coupon } from './types';
+import type { ApiResponse, Coupon } from '../types';
 
 export const couponApi = {
   // Get coupons for a shop

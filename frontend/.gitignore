@@ -28,8 +28,10 @@ dist-ssr
 
 # Environment variables
 .env
+.env.production
 .env.local
 .env.*.local
+!.env.production.example
 
 # OS
 .DS_Store

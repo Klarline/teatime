@@ -17,9 +17,11 @@ ENV/
 data/
 *.db
 *.sqlite3
+chroma_db/
 
 # Environment variables
 .env
+.env.production
 .env.local
 
 # Jupyter Notebook
@@ -39,3 +41,7 @@ dmypy.json
 dist/
 build/
 *.egg-info/
+
+# IDE
+.vscode/
+.idea/

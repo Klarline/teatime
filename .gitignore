@@ -11,6 +11,10 @@
 logs/
 *.log
 
+# Build artifacts
+*.tar.gz
+*.zip
+
 # IDE - IntelliJ IDEA
 .idea/
 *.iml

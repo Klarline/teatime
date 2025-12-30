@@ -1,6 +1,6 @@
 import { Heart } from 'lucide-react';
 import { parseImages } from '@/utils/formatters';
-import type { Blog } from '@/api/types';
+import type { Blog } from '@/types';
 
 interface BlogCardProps {
   blog: Blog;

@@ -1,4 +1,4 @@
-import type { ShopType } from '@/api/types';
+import type { ShopType } from '@/types';
 
 interface CategoryGridProps {
   categories: ShopType[];

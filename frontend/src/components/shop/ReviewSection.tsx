@@ -21,6 +21,9 @@ export const ReviewSection = ({ shopId }: ReviewSectionProps) => {
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+
   // Form state
   const [rating, setRating] = useState(5);
   const [content, setContent] = useState('');
@@ -36,20 +39,29 @@ export const ReviewSection = ({ shopId }: ReviewSectionProps) => {
       // Fetch reviews
       const reviewsResponse = await reviewApi.getShopReviews(shopId, 1, 10);
       if (reviewsResponse.success) {
-        setReviews(reviewsResponse.data);
+        // Append to existing reviews if page > 1
+        if (currentPage === 1) {
+          setReviews(reviewsResponse.data);
+        } else {
+          setReviews(prev => [...prev, ...reviewsResponse.data]);
+        }
+        // Check if there are more reviews
+        setHasMore(reviewsResponse.data.length === 10);
       }
 
-      // Fetch stats
-      const statsResponse = await reviewApi.getShopRatingStats(shopId);
-      if (statsResponse.success) {
-        setStats(statsResponse.data);
-      }
+      // Only fetch stats on first page
+      if (currentPage === 1) {
+        const statsResponse = await reviewApi.getShopRatingStats(shopId);
+        if (statsResponse.success) {
+          setStats(statsResponse.data);
+        }
 
-      // Check if user has reviewed (only if authenticated)
-      if (isAuthenticated) {
-        const hasReviewedResponse = await reviewApi.hasUserReviewed(shopId);
-        if (hasReviewedResponse.success) {
-          setHasReviewed(hasReviewedResponse.data);
+        // Check if user has reviewed (only if authenticated)
+        if (isAuthenticated) {
+          const hasReviewedResponse = await reviewApi.hasUserReviewed(shopId);
+          if (hasReviewedResponse.success) {
+            setHasReviewed(hasReviewedResponse.data);
+          }
         }
       }
     } catch (error) {
@@ -58,6 +70,16 @@ export const ReviewSection = ({ shopId }: ReviewSectionProps) => {
       setLoading(false);
     }
   };
+
+	const loadMoreReviews = () => {
+    setCurrentPage(prev => prev + 1);
+  };
+
+  useEffect(() => {
+    if (currentPage > 1) {
+      fetchReviewData();
+    }
+  }, [currentPage]);
 
   const handleSubmit = async () => {
     if (!isAuthenticated) {
@@ -239,6 +261,16 @@ export const ReviewSection = ({ shopId }: ReviewSectionProps) => {
               isDeleting={deletingId === review.id}
             />
           ))}
+          
+          {/* Load More Button */}
+          {hasMore && (
+            <button
+              onClick={loadMoreReviews}
+              className="w-full py-3 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Load More Reviews
+            </button>
+          )}
         </div>
       ) : (
         <div className="text-center py-8 text-gray-400 text-sm">

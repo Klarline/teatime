@@ -12,20 +12,20 @@ class RAGPipeline:
         End-to-end recommendation pipeline
         Returns: (recommendation_text, list_of_source_blog_ids)
         """
-        # Step 1: Retrieve relevant documents
+        # Retrieve relevant documents
         search_results = self.retriever.search(query, n_results=max_results)
         
         if not search_results['documents'][0]:
             return "I don't have enough information about tea shops yet. Please check back after some reviews are added!", []
         
-        # Step 2: Extract documents and metadata
+        # Extract documents and metadata
         documents = search_results['documents'][0]
         metadatas = search_results['metadatas'][0]
         
-        # Step 3: Generate recommendation
-        recommendation = self.generator.generate_recommendation(query, documents)
+        # Generate recommendation
+        recommendation = self.generator.generate_recommendation(query, documents, metadatas)
         
-        # Step 4: Extract source blog IDs
+        # Extract source blog IDs
         source_blog_ids = [meta['blog_id'] for meta in metadatas]
         
         return recommendation, source_blog_ids

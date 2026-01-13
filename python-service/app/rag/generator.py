@@ -8,13 +8,13 @@ class LLMGenerator:
     def __init__(self):
         self.model = genai.GenerativeModel(settings.gemini_model)
     
-    def generate_recommendation(self, query: str, context_documents: list[str]) -> str:
+    def generate_recommendation(self, query: str, context_documents: list[str], metadatas: list[dict]) -> str:
         """Generate recommendation based on query and retrieved documents"""
         
-        # Build context from retrieved documents
+        # Build context from retrieved documents WITH SHOP NAMES
         context = "\n\n".join([
-            f"Review {i+1}: {doc}" 
-            for i, doc in enumerate(context_documents)
+            f"Shop Name: {meta['shop_name']}\n{doc}" 
+            for doc, meta in zip(context_documents, metadatas)
         ])
         
         prompt = f"""You are a helpful tea shop recommendation assistant. Based STRICTLY on the tea shop reviews provided below, recommend specific shops that match the user's request.

@@ -17,7 +17,9 @@ export interface AIHealthResponse {
 
 export const aiApi = {
   getRecommendations: async (request: RecommendationRequest): Promise<RecommendationResponse> => {
-    const response = await axios.post('/ai/recommend', request);
+    const response = await axios.post('/ai/recommend', request, {
+      timeout: 30000
+    });
     return response.data.data;
   },
 

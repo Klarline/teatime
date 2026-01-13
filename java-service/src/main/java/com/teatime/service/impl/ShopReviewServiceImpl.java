@@ -144,8 +144,11 @@ public class ShopReviewServiceImpl extends ServiceImpl<ShopReviewMapper, ShopRev
 
     Map<String, Object> stats = baseMapper.selectMaps(avgWrapper).get(0);
 
-    // Round average to 1 decimal place
-    Double avgRating = (Double) stats.get("avgRating");
+    // Handle BigDecimal from MySQL
+    Object avgRatingObj = stats.get("avgRating");
+    double avgRating = avgRatingObj instanceof Number
+        ? ((Number) avgRatingObj).doubleValue()
+        : 0.0;
     Long reviewCount = (Long) stats.get("reviewCount");
 
     Map<String, Object> result = new HashMap<>();
@@ -211,7 +214,12 @@ public class ShopReviewServiceImpl extends ServiceImpl<ShopReviewMapper, ShopRev
         .eq("shop_id", shopId);
 
     Map<String, Object> stats = baseMapper.selectMaps(wrapper).get(0);
-    Double avgRating = (Double) stats.get("avgRating");
+
+    // Handle BigDecimal from MySQL
+    Object avgRatingObj = stats.get("avgRating");
+    double avgRating = avgRatingObj instanceof Number
+        ? ((Number) avgRatingObj).doubleValue()
+        : 0.0;
     Long reviewCount = (Long) stats.get("reviewCount");
 
     // Update shop

@@ -42,6 +42,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
   @Resource
   private StringRedisTemplate stringRedisTemplate;
 
+  /**
+   * Sends a verification code to the specified phone number.
+   *
+   * @param phone   the phone number to send the code to
+   * @param session the HTTP session
+   * @return a Result indicating success or failure
+   */
   @Override
   public Result sendCode(String phone, HttpSession session) {
     // validate phone number format
@@ -64,6 +71,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     return Result.ok();
   }
 
+  /**
+   * Logs in a user using the provided login form data.
+   *
+   * @param loginForm the login form data containing phone number and verification code
+   * @param session   the HTTP session
+   * @return a Result containing the user token if successful, or an error message if failed
+   */
   @Override
   public Result login(LoginFormDTO loginForm, HttpSession session) {
     // validate phone number format
@@ -104,14 +118,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     return Result.ok(token);
   }
 
+  /**
+   * Records a check-in for the current user.
+   *
+   * @return a Result indicating success
+   */
   @Override
   public Result checkIn() {
     // get current logged-in user
-    UserDTO userId = UserHolder.getUser();
+    UserDTO user = UserHolder.getUser();
     // get current date
     LocalDateTime now = LocalDateTime.now();
     String keySuffix = now.format(DateTimeFormatter.ofPattern("yyyyMM"));
-    String key = USER_CHECKIN_KEY + userId + keySuffix;
+    String key = USER_CHECKIN_KEY + user.getId() + keySuffix;
     // get day of month
     int dayOfMonth = now.getDayOfMonth();
     // set the bit at the position of the current day to 1
@@ -119,14 +138,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     return Result.ok();
   }
 
+  /**
+   * Counts the number of consecutive check-ins for the current user.
+   *
+   * @return a Result containing the count of consecutive check-ins
+   */
   @Override
   public Result checkInCount() {
     // get current logged-in user
-    UserDTO userId = UserHolder.getUser();
+    UserDTO user = UserHolder.getUser();
     // get current date
     LocalDateTime now = LocalDateTime.now();
     String keySuffix = now.format(DateTimeFormatter.ofPattern("yyyyMM"));
-    String key = USER_CHECKIN_KEY + userId + keySuffix;
+    String key = USER_CHECKIN_KEY + user.getId() + keySuffix;
     // get day of month
     int dayOfMonth = now.getDayOfMonth();
 
@@ -158,6 +182,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     return Result.ok(dayCount);
   }
 
+  /**
+   * Creates a new user with the specified phone number.
+   *
+   * @param phone the phone number of the new user
+   * @return the created User object
+   */
   private User createUserWithPhone(String phone) {
     User user = new User();
     user.setPhone(phone);

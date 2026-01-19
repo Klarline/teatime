@@ -44,7 +44,12 @@ public class ShopReviewServiceImpl extends ServiceImpl<ShopReviewMapper, ShopRev
   @Resource
   private IShopService shopService;
 
-
+  /**
+   * Create a new shop review
+   *
+   * @param review ShopReview object containing review details
+   * @return Result indicating success or failure
+   */
   @Override
   public Result createReview(ShopReview review) {
     // Get current user
@@ -106,6 +111,14 @@ public class ShopReviewServiceImpl extends ServiceImpl<ShopReviewMapper, ShopRev
     return Result.ok(review.getId());
   }
 
+  /**
+   * Get paginated reviews for a shop
+   *
+   * @param shopId  Shop ID
+   * @param current Current page number
+   * @param size    Number of reviews per page
+   * @return Result containing list of reviews
+   */
   @Override
   public Result getShopReviews(Long shopId, Integer current, Integer size) {
     // Build query with pagination
@@ -135,6 +148,12 @@ public class ShopReviewServiceImpl extends ServiceImpl<ShopReviewMapper, ShopRev
     return Result.ok(enrichedReviews);
   }
 
+  /**
+   * Get average rating and review count for a shop
+   *
+   * @param shopId Shop ID
+   * @return Result containing average rating and review count
+   */
   @Override
   public Result getShopRatingStats(Long shopId) {
     // Get average rating using QueryWrapper
@@ -158,6 +177,12 @@ public class ShopReviewServiceImpl extends ServiceImpl<ShopReviewMapper, ShopRev
     return Result.ok(result);
   }
 
+  /**
+   * Check if the current user has reviewed a specific shop
+   *
+   * @param shopId Shop ID
+   * @return Result indicating whether the user has reviewed the shop
+   */
   @Override
   public Result hasUserReviewed(Long shopId) {
     Long userId = UserHolder.getUser().getId();
@@ -171,6 +196,12 @@ public class ShopReviewServiceImpl extends ServiceImpl<ShopReviewMapper, ShopRev
     return Result.ok(count > 0);
   }
 
+  /**
+   * Delete a shop review
+   *
+   * @param reviewId Review ID
+   * @return Result indicating success or failure
+   */
   @Override
   public Result deleteReview(Long reviewId) {
     Long userId = UserHolder.getUser().getId();

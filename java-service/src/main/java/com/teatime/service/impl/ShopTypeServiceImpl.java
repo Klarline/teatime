@@ -26,6 +26,11 @@ public class ShopTypeServiceImpl extends ServiceImpl<ShopTypeMapper, ShopType>
   @Resource
   StringRedisTemplate stringRedisTemplate;
 
+  /**
+   * Query the list of shop types
+   *
+   * @return Result containing the list of shop types
+   */
   @Override
   public Result queryTypeList() {
     String key = CACHE_SHOP_TYPE_KEY;

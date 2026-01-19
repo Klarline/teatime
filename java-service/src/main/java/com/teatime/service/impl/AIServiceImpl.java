@@ -20,6 +20,13 @@ public class AIServiceImpl implements IAIService {
   @Resource
   private AIServiceConfig aiServiceConfig;
 
+  /**
+   * Communicates with the external AI service to get tea shop recommendations
+   * based on user preferences.
+   *
+   * @param request The recommendation request containing user preferences.
+   * @return The recommendation response from the AI service.
+   */
   @Override
   public RecommendationResponse getRecommendations(RecommendationRequest request) {
     try {
@@ -35,6 +42,11 @@ public class AIServiceImpl implements IAIService {
     }
   }
 
+  /**
+   * Ingests a review document into the AI service for future analysis.
+   *
+   * @param review The review document to be ingested.
+   */
   @Override
   public void ingestReview(ReviewDocument review) {
     try {
@@ -45,6 +57,11 @@ public class AIServiceImpl implements IAIService {
     }
   }
 
+  /**
+   * Checks the health status of the AI service.
+   *
+   * @return The health response from the AI service.
+   */
   @Override
   public AIHealthResponse checkHealth() {
     try {
@@ -58,6 +75,11 @@ public class AIServiceImpl implements IAIService {
     }
   }
 
+  /**
+   * Determines if the AI service is healthy based on its health status.
+   *
+   * @return true if the AI service is healthy, false otherwise.
+   */
   @Override
   public boolean isServiceHealthy() {
     AIHealthResponse health = checkHealth();

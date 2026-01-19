@@ -29,6 +29,14 @@ public class CacheClient {
   /**
    * Basic cache query method
    * Use for: Non-critical data, low traffic scenarios
+   *
+   * @param keyPrefix  Redis key prefix
+   * @param id         Unique identifier for the data
+   * @param type       Class type of the return value
+   * @param dbFallBack Function to query the database if cache miss
+   * @param time       Cache expiration time
+   * @param unit       Time unit for expiration time
+   * @return R          The queried data
    */
   public <R, ID> R query(String keyPrefix, ID id, Class<R> type, Function<ID, R> dbFallBack,
                          Long time, TimeUnit unit) {
@@ -50,6 +58,14 @@ public class CacheClient {
   /**
    * Query with cache pass-through (cache penetration protection)
    * Use for: Data that might not exist, susceptible to malicious queries
+   *
+   * @param keyPrefix  Redis key prefix
+   * @param id         Unique identifier for the data
+   * @param type       Class type of the return value
+   * @param dbFallBack Function to query the database if cache miss
+   * @param time       Cache expiration time
+   * @param unit       Time unit for expiration time
+   * @return R          The queried data
    */
   public <R, ID> R queryWithPassThrough(String keyPrefix, ID id, Class<R> type,
                                         Function<ID, R> dbFallBack, Long time, TimeUnit unit) {
@@ -84,6 +100,14 @@ public class CacheClient {
   /**
    * Query with mutex lock (cache breakdown protection)
    * Use for: Hot keys where data consistency is critical (inventory, pricing)
+   *
+   * @param keyPrefix  Redis key prefix
+   * @param id         Unique identifier for the data
+   * @param type       Class type of the return value
+   * @param dbFallBack Function to query the database if cache miss
+   * @param time       Cache expiration time
+   * @param unit       Time unit for expiration time
+   * @return R          The queried data
    */
   public <R, ID> R queryWithMutex(String keyPrefix, ID id, Class<R> type,
                                   Function<ID, R> dbFallBack, Long time, TimeUnit unit) {
@@ -102,15 +126,21 @@ public class CacheClient {
 
     // implement mutex lock to prevent cache breakdown
     String lockKey = "lock:" + key;
+
+    boolean isLock = tryLock(lockKey);
+    if (!isLock) {
+      // did not get the lock, sleep and retry
+      try {
+        Thread.sleep(50);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+      return queryWithMutex(keyPrefix, id, type, dbFallBack, time, unit);
+    }
+
+    // Got the lock - proceed with cache rebuild
     R r = null;
     try {
-      boolean isLock = tryLock(lockKey);
-      if (isLock) {
-        // did not get the lock, sleep and retry
-        Thread.sleep(50);
-        return queryWithMutex(keyPrefix, id, type, dbFallBack, time, unit);
-      }
-
       // Got lock - double check cache (maybe another thread already rebuilt it)
       json = stringRedisTemplate.opsForValue().get(key);
       if (StrUtil.isNotBlank(json)) {
@@ -128,10 +158,8 @@ public class CacheClient {
 
       // store information in Redis
       this.set(key, r, time, unit);
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
     } finally {
-      // release lock
+      // release lock (only executed when we have the lock)
       unlock(lockKey);
     }
     return r;
@@ -141,6 +169,14 @@ public class CacheClient {
    * Query with logical expiration (cache breakdown protection)
    * If cache is empty, queries database and sets up cache
    * Use for: Hot keys where availability is critical and stale data is acceptable
+   *
+   * @param keyPrefix  Redis key prefix
+   * @param id         Unique identifier for the data
+   * @param type       Class type of the return value
+   * @param dbFallBack Function to query the database if cache miss
+   * @param time       Cache expiration time
+   * @param unit       Time unit for expiration time
+   * @return R          The queried data
    */
   public <R, ID> R queryWithLogicalExpire(String keyPrefix, ID id, Class<R> type,
                                           Function<ID, R> dbFallBack, Long time, TimeUnit unit) {
@@ -195,10 +231,27 @@ public class CacheClient {
   }
 
   // Helper methods
+
+  /**
+   * Set data in Redis with expiration
+   *
+   * @param key   Redis key
+   * @param value Data to store
+   * @param time  Expiration time
+   * @param unit  Time unit for expiration time
+   */
   public void set(String key, Object value, Long time, TimeUnit unit) {
     stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(value), time, unit);
   }
 
+  /**
+   * Set data with logical expiration
+   *
+   * @param key   Redis key
+   * @param value Data to store
+   * @param time  Expiration time
+   * @param unit  Time unit for expiration time
+   */
   public void setLogicalExpire(String key, Object value, Long time, TimeUnit unit) {
     // create RedisData object with logical expiration
     RedisData redisData = new RedisData();
@@ -218,6 +271,4 @@ public class CacheClient {
   private void unlock(String key) {
     stringRedisTemplate.delete(key);
   }
-
-
 }

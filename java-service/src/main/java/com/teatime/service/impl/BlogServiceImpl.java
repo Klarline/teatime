@@ -49,6 +49,12 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
   @Resource
   private IAIService aiService;
 
+  /**
+   * Query hot blogs
+   *
+   * @param current current page
+   * @return hot blogs
+   */
   @Override
   public Result queryHotBlog(Integer current) {
     // query top liked blogs
@@ -66,6 +72,12 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     return Result.ok(records);
   }
 
+  /**
+   * Query blog by id
+   *
+   * @param id blog id
+   * @return blog
+   */
   @Override
   public Result queryBlogById(Long id) {
     // query blog
@@ -93,6 +105,12 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     blog.setIsLike(score != null);
   }
 
+  /**
+   * Like or unlike a blog
+   *
+   * @param id blog id
+   * @return result
+   */
   @Override
   public Result likeBlog(Long id) {
     Long userId = UserHolder.getUser().getId();
@@ -118,6 +136,12 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     return Result.ok();
   }
 
+  /**
+   * Query top 5 users who liked the blog
+   *
+   * @param id blog id
+   * @return top 5 users
+   */
   @Override
   public Result queryBlogLikes(Long id) {
     String key = BLOG_LIKED_KEY + id;
@@ -138,6 +162,12 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     return Result.ok(userDTOs);
   }
 
+  /**
+   * Save a new blog
+   *
+   * @param blog blog to save
+   * @return result
+   */
   @Override
   public Result saveBlog(Blog blog) {
     // get logged-in user
@@ -184,6 +214,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     return Result.ok(blog.getId());
   }
 
+  // query blog author information
   private void queryBlogUser(Blog blog) {
     Long userId = blog.getUserId();
     User user = userService.getById(userId);

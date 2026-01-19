@@ -30,6 +30,12 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon>
   private final IFlashSaleCouponService flashSaleCouponService;
   private final StringRedisTemplate stringRedisTemplate;
 
+  /**
+   * Query coupons of a specific shop
+   *
+   * @param shopId the shop id
+   * @return the result containing the list of coupons
+   */
   @Override
   public Result queryCouponOfShop(Long shopId) {
     // query coupons by shop id
@@ -41,6 +47,11 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon>
     return Result.ok(coupons);
   }
 
+  /**
+   * Add a flash sale coupon
+   *
+   * @param coupon the coupon to be added
+   */
   @Override
   @Transactional
   public void addFlashSaleCoupon(Coupon coupon) {

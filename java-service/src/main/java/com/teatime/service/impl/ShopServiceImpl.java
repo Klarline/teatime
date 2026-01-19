@@ -47,6 +47,12 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
   @Resource
   private CacheClient cacheClient;
 
+  /**
+   * Query shop by id with caching strategies
+   *
+   * @param id Shop id
+   * @return Result containing shop data
+   */
   @Override
   public Result queryById(Long id) {
     // solution 1: Cache penetration
@@ -62,7 +68,12 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     return Result.ok(shop);
   }
 
-
+  /**
+   * Update shop information and invalidate cache
+   *
+   * @param shop Shop entity with updated data
+   * @return Result indicating success or failure
+   */
   @Override
   @Transactional
   public Result update(Shop shop) {
@@ -78,6 +89,15 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     return Result.ok();
   }
 
+  /**
+   * Query shops by type with optional geolocation filtering
+   *
+   * @param typeId  Shop type id
+   * @param current Current page number
+   * @param x       Longitude (optional)
+   * @param y       Latitude (optional)
+   * @return Result containing list of shops
+   */
   @Override
   public Result queryShopByType(Integer typeId, Integer current, Double x, Double y) {
     if (x == null || y == null) {

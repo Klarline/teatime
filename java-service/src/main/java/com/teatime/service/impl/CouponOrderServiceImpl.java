@@ -65,6 +65,12 @@ public class CouponOrderServiceImpl extends ServiceImpl<CouponOrderMapper, Coupo
     FLASH_SALE_ORDER_EXECUTOR.submit(new CouponOrderHandler());
   }
 
+  /**
+   * Handle flash sale coupon purchase request
+   *
+   * @param couponId the coupon id
+   * @return Result containing order id or error message
+   */
   @Override
   public Result flashSaleCoupon(Long couponId) {
     Long userId = UserHolder.getUser().getId();
@@ -93,6 +99,7 @@ public class CouponOrderServiceImpl extends ServiceImpl<CouponOrderMapper, Coupo
     return Result.ok(orderId);
   }
 
+  // process coupon order
   private void handleCouponOrder(CouponOrder couponOrder) {
     Long userId = couponOrder.getUserId();
     RLock lock = redissonClient.getLock("lock:order:" + userId);
@@ -109,6 +116,11 @@ public class CouponOrderServiceImpl extends ServiceImpl<CouponOrderMapper, Coupo
     }
   }
 
+  /**
+   * Create coupon order with transactional support
+   *
+   * @param couponOrder the coupon order
+   */
   @Transactional
   public void createCouponOrder(CouponOrder couponOrder) {
     // check if user has already purchased
@@ -132,10 +144,13 @@ public class CouponOrderServiceImpl extends ServiceImpl<CouponOrderMapper, Coupo
     this.save(couponOrder);
   }
 
-
+  // background handler for processing coupon orders from Redis stream
   private class CouponOrderHandler implements Runnable {
     String queueName = "stream.orders";
 
+    /**
+     * Run the coupon order handler
+     */
     @Override
     public void run() {
       while (true) {
@@ -168,6 +183,7 @@ public class CouponOrderServiceImpl extends ServiceImpl<CouponOrderMapper, Coupo
       }
     }
 
+    // handle pending list for unacknowledged messages
     private void handlePendingList() {
       while (true) {
         try {

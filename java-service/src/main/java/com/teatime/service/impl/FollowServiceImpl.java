@@ -30,6 +30,12 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
   private final StringRedisTemplate stringRedisTemplate;
   private final IUserService userService;
 
+  /**
+   * Check if the current user follows another user
+   *
+   * @param followUserId the ID of the user to check
+   * @return Result indicating whether the current user follows the specified user
+   */
   @Override
   public Result isFollowed(Long followUserId) {
     Long userId = UserHolder.getUser().getId();
@@ -37,6 +43,13 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
     return Result.ok(count > 0);
   }
 
+  /**
+   * Follow or unfollow a user
+   *
+   * @param followUserId the ID of the user to follow or unfollow
+   * @param isFollow     true to follow, false to unfollow
+   * @return Result indicating the success of the operation
+   */
   @Override
   public Result followUser(Long followUserId, Boolean isFollow) {
     Long userId = UserHolder.getUser().getId();
@@ -63,6 +76,12 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
     return Result.ok();
   }
 
+  /**
+   * Get common followers between the current user and another user
+   *
+   * @param id the ID of the other user
+   * @return Result containing a list of common followers
+   */
   @Override
   public Result commonFollow(Long id) {
     // get current user id
@@ -86,12 +105,24 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
     return Result.ok(users);
   }
 
+  /**
+   * Get the follower count for a user
+   *
+   * @param userId the ID of the user
+   * @return Result containing the follower count
+   */
   @Override
   public Result getFollowerCount(Long userId) {
     Long count = query().eq("followed_user_id", userId).count();
     return Result.ok(count);
   }
 
+  /**
+   * Get the following count for a user
+   *
+   * @param userId the ID of the user
+   * @return Result containing the following count
+   */
   @Override
   public Result getFollowingCount(Long userId) {
     Long count = query().eq("user_id", userId).count();

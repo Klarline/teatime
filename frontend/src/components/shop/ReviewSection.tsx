@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Star, MessageSquare, X } from 'lucide-react';
 import { ReviewCard } from './ReviewCard';
 import { reviewApi } from '@/api/review.api';
@@ -28,16 +28,12 @@ export const ReviewSection = ({ shopId }: ReviewSectionProps) => {
   const [rating, setRating] = useState(5);
   const [content, setContent] = useState('');
 
-  useEffect(() => {
-    fetchReviewData();
-  }, [shopId]);
-
-  const fetchReviewData = async () => {
+  const fetchReviewData = useCallback(async () => {
     try {
       setLoading(true);
 
       // Fetch reviews
-      const reviewsResponse = await reviewApi.getShopReviews(shopId, 1, 10);
+      const reviewsResponse = await reviewApi.getShopReviews(shopId, currentPage, 10);
       if (reviewsResponse.success) {
         // Append to existing reviews if page > 1
         if (currentPage === 1) {
@@ -69,17 +65,15 @@ export const ReviewSection = ({ shopId }: ReviewSectionProps) => {
     } finally {
       setLoading(false);
     }
-  };
-
-	const loadMoreReviews = () => {
-    setCurrentPage(prev => prev + 1);
-  };
+  }, [shopId, currentPage, isAuthenticated]);
 
   useEffect(() => {
-    if (currentPage > 1) {
-      fetchReviewData();
-    }
-  }, [currentPage]);
+    fetchReviewData();
+  }, [fetchReviewData]);
+
+  const loadMoreReviews = () => {
+    setCurrentPage(prev => prev + 1);
+  };
 
   const handleSubmit = async () => {
     if (!isAuthenticated) {
@@ -110,14 +104,16 @@ export const ReviewSection = ({ shopId }: ReviewSectionProps) => {
         setRating(5);
         setHasReviewed(true);
         
-        // Refresh reviews
+        // Reset to page 1 and refresh
+        setCurrentPage(1);
         fetchReviewData();
       } else {
         toast.error(response.errorMsg || 'Failed to post review');
       }
-    } catch (error: any) {
-      console.error('Failed to create review:', error);
-      toast.error(error.response?.data?.errorMsg || 'Failed to post review');
+    } catch (error) {
+      console.error('Failed to post review:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to post review';
+      toast.error(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -148,15 +144,16 @@ export const ReviewSection = ({ shopId }: ReviewSectionProps) => {
       } else {
         toast.error(response.errorMsg || 'Failed to delete review');
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to delete review:', error);
-      toast.error('Failed to delete review');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete review';
+      toast.error(errorMessage);
     } finally {
       setDeletingId(null);
     }
   };
 
-  if (loading) {
+  if (loading && currentPage === 1) {
     return (
       <div className="py-8 text-center text-gray-400">
         <div className="animate-spin">⏳</div>
@@ -266,9 +263,10 @@ export const ReviewSection = ({ shopId }: ReviewSectionProps) => {
           {hasMore && (
             <button
               onClick={loadMoreReviews}
-              className="w-full py-3 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+              disabled={loading}
+              className="w-full py-3 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
             >
-              Load More Reviews
+              {loading ? 'Loading...' : 'Load More Reviews'}
             </button>
           )}
         </div>

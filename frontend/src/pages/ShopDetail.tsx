@@ -88,16 +88,19 @@ export const ShopDetail = () => {
 				// Handle specific errors
 				alert(response.errorMsg || 'Failed to claim coupon');
 			}
-		} catch (error: any) {
-			console.error('Failed to purchase coupon:', error);
+		} catch (err) {
+			console.error('Failed to purchase coupon:', err);
+
+            // Type assertion for axios error
+            const error = err as { response?: { status?: number; data?: { errorMsg?: string } } };
 			
 			// Handle common errors
-			if (error.response?.status === 401) {
-				alert('Please login to claim coupons');
-				navigate('/login');
-			} else {
-				alert(error.response?.data?.errorMsg || 'Failed to claim coupon. Please try again.');
-			}
+            if (error.response?.status === 401) {
+                alert('Please login to claim coupons');
+                navigate('/login');
+            } else {
+                alert(error.response?.data?.errorMsg || 'Failed to claim coupon. Please try again.');
+            }
 		} finally {
 			setPurchasingCouponId(null);
 		}

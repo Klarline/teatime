@@ -501,17 +501,17 @@ pytest --cov=app --cov-report=html
 Every push to the repository triggers automated workflows:
 
 **Build & Test Pipeline:**
-- ✅ Backend tests with JUnit 5 and JaCoCo coverage
-- ✅ Frontend tests with Jest and React Testing Library
-- ✅ Python tests with pytest
-- ✅ Security vulnerability scanning
-- ✅ Code quality checks
+- Backend tests with JUnit 5 and JaCoCo coverage
+- Frontend tests with Jest and React Testing Library
+- Python tests with pytest
+- Security vulnerability scanning
+- Code quality checks
 
 **Docker Build Pipeline:**
-- ✅ Multi-stage builds for all services
-- ✅ Image optimization and layer caching
-- ✅ Automated tagging with git SHA
-- ✅ AWS deployment
+- Multi-stage builds for all services
+- Image optimization and layer caching
+- Automated tagging with git SHA
+- AWS deployment
 
 View pipeline status: [GitHub Actions](https://github.com/Klarline/teatime/actions)
 

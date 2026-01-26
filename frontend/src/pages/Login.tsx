@@ -45,9 +45,10 @@ export const Login = () => {
       } else {
         toast.error(response.errorMsg || 'Failed to send code');
       }
-    } catch (err: any) {
-      console.error('Failed to send code:', err);
-      toast.error(err.response?.data?.errorMsg || 'Failed to send verification code');
+    } catch (error) {
+      console.error('Failed to send code:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send verification code';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -68,9 +69,10 @@ export const Login = () => {
       await login(phone, code);
       toast.success('Login successful!');
       navigate('/', { replace: true });
-    } catch (err: any) {
-      console.error('Login failed:', err);
-      toast.error(err.response?.data?.errorMsg || 'Invalid verification code');
+    } catch (error) {
+      console.error('Login failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Invalid verification code';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

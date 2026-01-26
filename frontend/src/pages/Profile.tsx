@@ -151,7 +151,9 @@ export const Profile = () => {
 		};
 
 		fetchProfileData();
-	}, [id, isOwnProfile, currentUser, isAuthenticated, navigate, setCheckinStreak]);
+    }, 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [id, isOwnProfile, currentUser, isAuthenticated, navigate, setCheckinStreak]);
 
 	const handleLogout = () => {
 		toast((t) => (

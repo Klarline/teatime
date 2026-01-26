@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'coverage']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -21,6 +21,17 @@ export default defineConfig([
         ...globals.browser,
         ...globals.jest,
       },
+    },
+    rules: {
+      // Disable @typescript-eslint/no-explicit-any for test files
+      '@typescript-eslint/no-explicit-any': 'error',
+    },
+  },
+  // Override rules for test files
+  {
+    files: ['**/__tests__/**/*', '**/*.test.ts', '**/*.test.tsx'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 ])

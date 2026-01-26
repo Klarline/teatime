@@ -17,7 +17,7 @@ describe('Input', () => {
   });
 
   it('renders with icon', () => {
-    const { container } = render(
+    render(
       <Input placeholder="Search" icon={<Search data-testid="search-icon" />} />
     );
     expect(screen.getByTestId('search-icon')).toBeInTheDocument();

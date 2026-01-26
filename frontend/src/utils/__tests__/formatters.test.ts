@@ -21,7 +21,7 @@ describe('formatters', () => {
     });
 
     it('returns empty array for null/undefined', () => {
-      const result = parseImages(null as any);
+      const result = parseImages(null as unknown as string);
       expect(result).toEqual([]);
     });
 

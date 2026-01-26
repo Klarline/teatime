@@ -53,9 +53,10 @@ export const CreatePost = () => {
 
 			setImages([...images, ...urls]);
 			toast.success(`${files.length} image${files.length > 1 ? 's' : ''} uploaded!`);
-		} catch (err: any) {
-			console.error('Upload failed:', err);
-			toast.error(err.response?.data?.errorMsg || 'Failed to upload images');
+		} catch (error) {
+			console.error('Upload failed:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Failed to upload images';
+			toast.error(errorMessage);
 		} finally {
 			setUploading(false);
 		}
@@ -76,9 +77,10 @@ export const CreatePost = () => {
 				const records = response.data?.records || response.data || [];
 				setShops(records);
 			}
-		} catch (err: any) {
-			console.error('Failed to fetch shops:', err);
-			toast.error('Failed to load shops');
+		} catch (error) {
+			console.error('Failed to fetch shops:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Failed to load shops';
+			toast.error(errorMessage);
 		} finally {
 			setLoadingShops(false);
 		}
@@ -131,9 +133,10 @@ export const CreatePost = () => {
 			} else {
 				toast.error(response.errorMsg || 'Failed to create post');
 			}
-		} catch (err: any) {
-			console.error('Failed to create post:', err);
-			toast.error(err.response?.data?.errorMsg || 'Failed to create post');
+		} catch (error) {
+			console.error('Failed to create post:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Failed to create post';
+			toast.error(errorMessage);
 		} finally {
 			setPosting(false);
 		}

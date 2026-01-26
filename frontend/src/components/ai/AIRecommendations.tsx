@@ -78,14 +78,14 @@ export const AIRecommendations: React.FC = () => {
 				<div className="mt-6 p-4 bg-[#0f9289]/5 rounded-xl border border-[#0f9289]/20">
 					<ReactMarkdown
 						components={{
-							p: ({ node, ...props }) => <p className="text-sm text-gray-700 leading-relaxed my-2" {...props} />,
-							h1: ({ node, ...props }) => <h1 className="text-lg font-bold text-gray-900 mt-4 mb-2" {...props} />,
-							h2: ({ node, ...props }) => <h2 className="text-base font-bold text-gray-900 mt-3 mb-2" {...props} />,
-							h3: ({ node, ...props }) => <h3 className="text-sm font-bold text-gray-900 mt-2 mb-1" {...props} />,
-							ul: ({ node, ...props }) => <ul className="list-disc list-inside my-2 text-sm text-gray-700 space-y-2" {...props} />,
-							ol: ({ node, ...props }) => <ol className="list-decimal list-outside ml-5 my-2 text-sm text-gray-700 space-y-3" {...props} />,
-							li: ({ node, ...props }) => <li className="text-gray-700 leading-relaxed" {...props} />,
-							strong: ({ node, ...props }) => <strong className="font-semibold text-gray-900" {...props} />,
+							p: (props) => <p className="text-sm text-gray-700 leading-relaxed my-2" {...props} />,
+							h1: (props) => <h1 className="text-lg font-bold text-gray-900 mt-4 mb-2" {...props} />,
+							h2: (props) => <h2 className="text-base font-bold text-gray-900 mt-3 mb-2" {...props} />,
+							h3: (props) => <h3 className="text-sm font-bold text-gray-900 mt-2 mb-1" {...props} />,
+							ul: (props) => <ul className="list-disc list-inside my-2 text-sm text-gray-700 space-y-2" {...props} />,
+							ol: (props) => <ol className="list-decimal list-outside ml-5 my-2 text-sm text-gray-700 space-y-3" {...props} />,
+							li: (props) => <li className="text-gray-700 leading-relaxed" {...props} />,
+							strong: (props) => <strong className="font-semibold text-gray-900" {...props} />,
 						}}
 					>
 						{recommendations}

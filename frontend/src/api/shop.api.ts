@@ -14,7 +14,7 @@ export const shopApi = {
     current: number = 1,
     coords?: { x: number; y: number }
   ): Promise<ApiResponse<PageResult<Shop>>> => {
-    const params: any = { typeId, current };
+    const params: { typeId: number; current: number; x?: number; y?: number } = { typeId, current };
     if (coords) {
       params.x = coords.x;
       params.y = coords.y;

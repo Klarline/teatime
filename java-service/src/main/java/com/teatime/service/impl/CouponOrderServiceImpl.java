@@ -61,9 +61,26 @@ public class CouponOrderServiceImpl extends ServiceImpl<CouponOrderMapper, Coupo
   private ICouponOrderService proxy;
 
   @PostConstruct
-  public void init() {
-    FLASH_SALE_ORDER_EXECUTOR.submit(new CouponOrderHandler());
-  }
+public void init() {
+    // Initialize stream handler asynchronously to not block application startup
+    FLASH_SALE_ORDER_EXECUTOR.submit(() -> {
+        try {
+            // Create consumer group if it doesn't exist
+            try {
+                stringRedisTemplate.opsForStream()
+                    .createGroup("stream.orders", "g1");
+                log.info("Created Redis Stream consumer group 'g1' for 'stream.orders'");
+            } catch (Exception e) {
+                log.info("Consumer group 'g1' already exists or will be created on first message");
+            }
+            
+            // Start processing orders
+            new CouponOrderHandler().run();
+        } catch (Exception e) {
+            log.error("Error initializing coupon order handler: {}", e.getMessage());
+        }
+    });
+}
 
   /**
    * Handle flash sale coupon purchase request

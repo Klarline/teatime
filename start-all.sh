@@ -1,114 +1,73 @@
 #!/bin/bash
+set -e
 
-echo "Starting TeaTime services..."
-echo ""
+echo "🚀 Starting TeaTime services with Docker Compose..."
 
-# Set Java 17 for this script
-export JAVA_HOME=$(/usr/libexec/java_home -v 17)
-echo "Using Java 17: $JAVA_HOME"
-echo ""
-
-# Check if services are already running
-if lsof -Pi :8081 -sTCP:LISTEN -t >/dev/null ; then
-    echo "WARNING: Port 8081 already in use (Java service may be running)"
-    echo "         Stop it with: lsof -ti:8081 | xargs kill -9"
+# Check if .env exists
+if [ ! -f .env ]; then
+    echo "⚠️  No .env file found. Creating from .env.example..."
+    cp .env.example .env
+    echo "⚠️  Please edit .env with your actual values (especially GOOGLE_API_KEY)"
+    echo "   Then run this script again."
     exit 1
 fi
 
-if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null ; then
-    echo "WARNING: Port 8000 already in use (Python service may be running)"
-    echo "         Stop it with: lsof -ti:8000 | xargs kill -9"
+# Load environment variables
+source .env
+
+# Check for required variables
+if [ -z "$GOOGLE_API_KEY" ] || [ "$GOOGLE_API_KEY" == "your_gemini_api_key_here" ]; then
+    echo "❌ GOOGLE_API_KEY not configured in .env"
+    echo "   Get your key from: https://makersuite.google.com/app/apikey"
     exit 1
 fi
 
-# Create logs directory if it doesn't exist
-mkdir -p logs
-
-# Start Java service
-echo "Starting Java Spring Boot service..."
-cd java-service
-mvn spring-boot:run > ../logs/java-service.log 2>&1 &
-JAVA_PID=$!
-cd ..
-echo "Java service started (PID: $JAVA_PID)"
-
-# Wait for Java service to be ready
-echo "Waiting for Java service to be ready..."
-for i in {1..30}; do
-    if curl -s http://localhost:8081/api/user/code > /dev/null 2>&1; then
-        echo "Java service is ready!"
-        break
-    fi
-    sleep 2
-done
-
-# Start Python service with conda
-echo ""
-echo "Starting Python AI service..."
-cd python-service
-
-# Check if conda environment exists
-if conda env list | grep -q "teatime-ai"; then
-    echo "Using conda environment: teatime-ai"
-    # Use conda run to execute in the environment
-    conda run -n teatime-ai python -m app.main > ../logs/python-service.log 2>&1 &
-    PYTHON_PID=$!
-else
-    echo "WARNING: Conda environment 'teatime-ai' not found!"
-    echo "         Create it with: conda create -n teatime-ai python=3.10"
-    echo "         Then install dependencies: conda activate teatime-ai && pip install -r requirements.txt"
-    kill $JAVA_PID
-    exit 1
-fi
-
-cd ..
-echo "Python AI service started (PID: $PYTHON_PID)"
-
-# Wait for Python service to be ready
-echo "Waiting for Python AI service to be ready..."
-for i in {1..20}; do
-    if curl -s http://localhost:8000/health > /dev/null 2>&1; then
-        echo "Python AI service is ready!"
-        break
-    fi
-    sleep 1
-done
-
-# Start Frontend
-echo ""
-echo "Starting React frontend..."
-cd frontend
-npm run dev > ../logs/frontend.log 2>&1 &
-FRONTEND_PID=$!
-cd ..
-echo "Frontend started (PID: $FRONTEND_PID)"
+echo "📦 Building and starting services..."
+docker-compose up -d --build
 
 echo ""
-echo "========================================"
-echo "All TeaTime services are running!"
-echo "========================================"
-echo ""
-echo "Services:"
-echo "  Frontend:    http://localhost:3000"
-echo "  Java API:    http://localhost:8081"
-echo "  Python AI:   http://localhost:8000"
-echo ""
-echo "Process IDs:"
-echo "  Java:    $JAVA_PID"
-echo "  Python:  $PYTHON_PID"
-echo "  Frontend: $FRONTEND_PID"
-echo ""
-echo "Logs:"
-echo "  Java:    tail -f logs/java-service.log"
-echo "  Python:  tail -f logs/python-service.log"
-echo "  Frontend: tail -f logs/frontend.log"
-echo ""
-echo "To stop all services:"
-echo "  Press Ctrl+C or run: ./stop-all.sh"
+echo "⏳ Waiting for services to be healthy..."
 echo ""
 
-# Wait for Ctrl+C
-trap "echo ''; echo 'Stopping all services...'; kill $JAVA_PID $PYTHON_PID $FRONTEND_PID 2>/dev/null; echo 'All services stopped'; exit 0" EXIT INT TERM
+# Wait for MySQL
+echo "   Waiting for MySQL..."
+timeout 60 bash -c 'until docker-compose exec -T mysql mysqladmin ping -h localhost -u root -p$MYSQL_ROOT_PASSWORD 2>/dev/null; do sleep 2; done' || true
+echo "   ✅ MySQL is ready"
 
-# Keep script running
-wait
+# Wait for Redis
+echo "   Waiting for Redis..."
+timeout 30 bash -c 'until docker-compose exec -T redis redis-cli ping 2>/dev/null; do sleep 2; done' || true
+echo "   ✅ Redis is ready"
+
+# Wait for Java service
+echo "   Waiting for Java service..."
+timeout 90 bash -c 'until curl -sf http://localhost:8081/actuator/health > /dev/null 2>&1; do sleep 3; done' || true
+echo "   ✅ Java service is ready"
+
+# Wait for Python service
+echo "   Waiting for Python AI service..."
+timeout 60 bash -c 'until curl -sf http://localhost:8000/ai/health > /dev/null 2>&1; do sleep 3; done' || true
+echo "   ✅ Python service is ready"
+
+# Wait for Frontend
+echo "   Waiting for Frontend..."
+timeout 30 bash -c 'until curl -sf http://localhost:3000/health > /dev/null 2>&1; do sleep 2; done' || true
+echo "   ✅ Frontend is ready"
+
+echo ""
+echo "✨ All services are up and running!"
+echo ""
+echo "🌐 Access the application:"
+echo "   Frontend:     http://localhost:3000"
+echo "   Java API:     http://localhost:8081/api"
+echo "   Python AI:    http://localhost:8000"
+echo "   API Docs:     http://localhost:8000/docs"
+echo ""
+echo "📊 View logs:"
+echo "   All services: docker-compose logs -f"
+echo "   Java only:    docker-compose logs -f java-service"
+echo "   Python only:  docker-compose logs -f python-service"
+echo ""
+echo "🛑 Stop services:"
+echo "   ./stop-all.sh"
+echo ""

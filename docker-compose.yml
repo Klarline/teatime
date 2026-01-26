@@ -1,0 +1,131 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: teatime-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
+      MYSQL_DATABASE: teatime
+      MYSQL_USER: ${MYSQL_USER:-teatime}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-teatime123}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - teatime-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: teatime-redis
+    command: redis-server --appendonly yes --requirepass 123321
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - teatime-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "123321", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Java Backend Service
+  java-service:
+    build:
+      context: ./java-service
+      dockerfile: Dockerfile
+    container_name: teatime-java
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/teatime?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-teatime}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-teatime123}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: 123321
+      TEATIME_AI_SERVICE_URL: http://python-service:8000
+    ports:
+      - "8081:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - teatime-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Python AI Service
+  python-service:
+    build:
+      context: ./python-service
+      dockerfile: Dockerfile
+    container_name: teatime-python
+    environment:
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      GEMINI_MODEL: gemini-1.5-flash
+      EMBEDDING_MODEL: models/embedding-001
+      VECTOR_DB_TYPE: chroma
+      CHROMA_PERSIST_DIR: /app/data/chroma_db
+      JAVA_SERVICE_URL: http://java-service:8081
+    ports:
+      - "8000:8000"
+    volumes:
+      - vector-db:/app/data
+    networks:
+      - teatime-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ai/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: teatime-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      java-service:
+        condition: service_healthy
+    networks:
+      - teatime-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  mysql-data:
+    driver: local
+  redis-data:
+    driver: local
+  vector-db:
+    driver: local
+
+networks:
+  teatime-network:
+    driver: bridge

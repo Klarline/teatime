@@ -48,7 +48,10 @@ public class MvcConfig implements WebMvcConfigurer {
 
             // Public resources
             "/api/coupon/list/**",
-            "/api/upload/**"
+            "/api/upload/**",
+
+            // Actuator endpoints
+            "/actuator/**"
 
         ).order(1);
   }

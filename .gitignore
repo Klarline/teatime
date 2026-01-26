@@ -7,6 +7,18 @@
 .env.local
 .env.*.local
 
+# Database dumps (contain sensitive data)
+*.sql
+teatime_dump.sql
+
+# Docker volumes data
+mysql-data/
+redis-data/
+vector-db/
+
+# Python AI service data
+python-service/data/
+
 # Logs directory
 logs/
 *.log

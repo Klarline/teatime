@@ -156,7 +156,7 @@ jobs:
           name: python-coverage
           path: python-service/coverage.xml
 
-	# Job 4: Code Quality & Security Checks
+  # Job 4: Code Quality & Security Checks
   code-quality:
     name: Code Quality & Security
     runs-on: ubuntu-latest
@@ -213,4 +213,49 @@ jobs:
       - name: Create quality summary
         run: |
           echo "## Code Quality Summary" >> $GITHUB_STEP_SUMMARY
-          echo "All quality checks passed" >> $GITHUB_STEP_SUMMARY		
+          echo "All quality checks passed" >> $GITHUB_STEP_SUMMARY
+
+# Job 5: Build and Push Docker Images (DISABLED - for AWS deployment)
+  build-images:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-test, python-test]
+    if: false  # Disabled - enable when deploying to AWS
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Build Java service image
+        working-directory: ./java-service
+        run: |
+          docker build -t teatime-java:${{ github.sha }} .
+          docker tag teatime-java:${{ github.sha }} teatime-java:latest
+      
+      - name: Build Python service image
+        working-directory: ./python-service
+        run: |
+          docker build -t teatime-python:${{ github.sha }} .
+          docker tag teatime-python:${{ github.sha }} teatime-python:latest
+      
+      - name: Build Frontend image
+        working-directory: ./frontend
+        run: |
+          docker build -t teatime-frontend:${{ github.sha }} .
+          docker tag teatime-frontend:${{ github.sha }} teatime-frontend:latest
+
+  # Job 6: Deploy to Production (DISABLED - for AWS deployment)
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build-images
+    if: false  # Disabled - enable when deploying to AWS
+    
+    steps:
+      - name: Deploy via SSH
+        run: |
+          echo "Would deploy to production here"
+          echo "Skipped - no AWS deployment configured"

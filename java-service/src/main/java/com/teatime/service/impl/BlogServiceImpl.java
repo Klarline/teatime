@@ -17,6 +17,7 @@ import com.teatime.service.IBlogService;
 import com.teatime.service.IFollowService;
 import com.teatime.service.IShopService;
 import com.teatime.service.IUserService;
+import com.teatime.utils.RedisFallback;
 import com.teatime.utils.SystemConstants;
 import com.teatime.utils.UserHolder;
 import java.util.Collections;
@@ -81,8 +82,11 @@ public class BlogServiceImpl implements IBlogService {
       return;
     }
     Long userId = user.getId();
-    String key = "blog:liked:" + blog.getId();
-    Double score = stringRedisTemplate.opsForZSet().score(key, userId.toString());
+    String key = BLOG_LIKED_KEY + blog.getId();
+    Double score = RedisFallback.execute(
+        () -> stringRedisTemplate.opsForZSet().score(key, userId.toString()),
+        () -> null
+    );
     blog.setIsLike(score != null);
   }
 
@@ -90,16 +94,21 @@ public class BlogServiceImpl implements IBlogService {
   public Result likeBlog(Long id) {
     Long userId = UserHolder.getUser().getId();
     String key = BLOG_LIKED_KEY + id;
-    Double score = stringRedisTemplate.opsForZSet().score(key, userId.toString());
+    Double score = RedisFallback.execute(
+        () -> stringRedisTemplate.opsForZSet().score(key, userId.toString()),
+        () -> null
+    );
     if (score == null) {
       int updated = blogRepository.incrementLiked(id);
       if (updated > 0) {
-        stringRedisTemplate.opsForZSet().add(key, userId.toString(), System.currentTimeMillis());
+        RedisFallback.executeVoid(() ->
+            stringRedisTemplate.opsForZSet().add(key, userId.toString(), System.currentTimeMillis()));
       }
     } else {
       int updated = blogRepository.decrementLiked(id);
       if (updated > 0) {
-        stringRedisTemplate.opsForZSet().remove(key, userId.toString());
+        RedisFallback.executeVoid(() ->
+            stringRedisTemplate.opsForZSet().remove(key, userId.toString()));
       }
       return null;
     }
@@ -109,7 +118,10 @@ public class BlogServiceImpl implements IBlogService {
   @Override
   public Result queryBlogLikes(Long id) {
     String key = BLOG_LIKED_KEY + id;
-    Set<String> top5 = stringRedisTemplate.opsForZSet().range(key, 0, 4);
+    Set<String> top5 = RedisFallback.execute(
+        () -> stringRedisTemplate.opsForZSet().range(key, 0, 4),
+        () -> Collections.emptySet()
+    );
 
     if (top5 == null || top5.isEmpty()) {
       return Result.ok(Collections.emptyList());
@@ -154,8 +166,9 @@ public class BlogServiceImpl implements IBlogService {
     for (Follow follow : follows) {
       Long followerId = follow.getUserId();
       String feedKey = FEED_KEY + followerId;
-      stringRedisTemplate.opsForZSet()
-          .add(feedKey, blog.getId().toString(), System.currentTimeMillis());
+      RedisFallback.executeVoid(() ->
+          stringRedisTemplate.opsForZSet()
+              .add(feedKey, blog.getId().toString(), System.currentTimeMillis()));
     }
 
     return Result.ok(blog.getId());

@@ -3,6 +3,7 @@ package com.teatime.service.impl;
 import static com.teatime.utils.RedisConstants.CACHE_SHOP_TYPE_KEY;
 
 import cn.hutool.core.util.StrUtil;
+import com.teatime.utils.RedisFallback;
 import cn.hutool.json.JSONUtil;
 import com.teatime.dto.Result;
 import com.teatime.entity.ShopType;
@@ -31,14 +32,18 @@ public class ShopTypeServiceImpl implements IShopTypeService {
   public Result queryTypeList() {
     String key = CACHE_SHOP_TYPE_KEY;
 
-    String json = stringRedisTemplate.opsForValue().get(key);
+    String json = RedisFallback.execute(
+        () -> stringRedisTemplate.opsForValue().get(key),
+        () -> null
+    );
     if (StrUtil.isNotBlank(json)) {
       List<ShopType> typeList = JSONUtil.toList(json, ShopType.class);
       return Result.ok(typeList);
     }
 
     List<ShopType> typeList = shopTypeRepository.findAll(Sort.by(Sort.Direction.ASC, "sort"));
-    stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(typeList));
+    RedisFallback.executeVoid(() ->
+        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(typeList)));
 
     return Result.ok(typeList);
   }

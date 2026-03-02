@@ -10,6 +10,7 @@ import com.teatime.entity.Shop;
 import com.teatime.repository.ShopRepository;
 import com.teatime.service.IShopService;
 import com.teatime.utils.CacheClient;
+import com.teatime.utils.RedisFallback;
 import com.teatime.utils.SystemConstants;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -64,7 +65,8 @@ public class ShopServiceImpl implements IShopService {
       return Result.fail("Shop id cannot be null!");
     }
     shopRepository.save(shop);
-    stringRedisTemplate.delete(CACHE_SHOP_KEY + shop.getId());
+    RedisFallback.executeVoid(() ->
+        stringRedisTemplate.delete(CACHE_SHOP_KEY + shop.getId()));
     return Result.ok();
   }
 
@@ -81,17 +83,28 @@ public class ShopServiceImpl implements IShopService {
     int from = (current - 1) * SystemConstants.DEFAULT_PAGE_SIZE;
     int end = current * SystemConstants.DEFAULT_PAGE_SIZE;
 
-    String key = SHOP_GEO_KEY + typeId;
-    GeoResults<RedisGeoCommands.GeoLocation<String>> results = stringRedisTemplate.opsForGeo()
-        .search(key, GeoReference.fromCoordinate(x, y), new Distance(5000),
-            RedisGeoCommands.GeoSearchCommandArgs.newGeoSearchArgs().includeDistance().limit(end));
+    GeoResults<RedisGeoCommands.GeoLocation<String>> results = RedisFallback.execute(
+        () -> {
+          String key = SHOP_GEO_KEY + typeId;
+          return stringRedisTemplate.opsForGeo()
+              .search(key, GeoReference.fromCoordinate(x, y), new Distance(5000),
+                  RedisGeoCommands.GeoSearchCommandArgs.newGeoSearchArgs()
+                      .includeDistance().limit(end));
+        },
+        () -> null
+    );
 
     if (results == null) {
-      return Result.ok(Collections.emptyList());
+      // Redis unavailable or no geo data - fallback to DB query by type (no distance ordering)
+      List<Shop> shops = shopRepository.findByTypeId(
+          typeId.longValue(),
+          PageRequest.of(current - 1, SystemConstants.DEFAULT_PAGE_SIZE)
+      ).getContent();
+      return Result.ok(shops);
     }
 
     List<GeoResult<RedisGeoCommands.GeoLocation<String>>> list = results.getContent();
-    if (list.size() <= from) {
+    if (list == null || list.size() <= from) {
       return Result.ok(Collections.emptyList());
     }
 
@@ -111,7 +124,10 @@ public class ShopServiceImpl implements IShopService {
     shops.sort(Comparator.comparingInt(s -> orderMap.getOrDefault(s.getId(), Integer.MAX_VALUE)));
 
     for (Shop shop : shops) {
-      shop.setDistance(distanceMap.get(shop.getId().toString()).getValue());
+      Distance dist = distanceMap.get(shop.getId().toString());
+      if (dist != null) {
+        shop.setDistance(dist.getValue());
+      }
     }
 
     return Result.ok(shops);

@@ -27,11 +27,12 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
       return true;
     }
 
-    // get user information from Redis
-    String key = RedisConstants.LOGIN_USER_KEY + token;
-    Map<Object, Object>
-        userMap = stringRedisTemplate.opsForHash().entries(key);
-    if (userMap.isEmpty()) {
+    // get user information from Redis (falls back to in-memory store when Redis unavailable)
+    Map<Object, Object> userMap = RedisFallback.execute(
+        () -> stringRedisTemplate.opsForHash().entries(RedisConstants.LOGIN_USER_KEY + token),
+        () -> FallbackSessionStore.getSession(token)
+    );
+    if (userMap == null || userMap.isEmpty()) {
       return true;
     }
     UserDTO userDTO = BeanUtil.fillBeanWithMap(userMap, new UserDTO(), false);
@@ -40,7 +41,13 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
     UserHolder.saveUser((UserDTO) userDTO);
 
     // refresh token expiration time
-    stringRedisTemplate.expire(key, RedisConstants.LOGIN_USER_TTL, TimeUnit.SECONDS);
+    RedisFallback.executeWithStatus(
+        () -> stringRedisTemplate.expire(
+            RedisConstants.LOGIN_USER_KEY + token,
+            RedisConstants.LOGIN_USER_TTL,
+            TimeUnit.SECONDS),
+        () -> FallbackSessionStore.refreshSession(token)
+    );
 
     return true;
   }

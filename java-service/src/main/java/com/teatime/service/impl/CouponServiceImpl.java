@@ -8,6 +8,7 @@ import com.teatime.entity.FlashSaleCoupon;
 import com.teatime.repository.CouponRepository;
 import com.teatime.service.IFlashSaleCouponService;
 import com.teatime.service.ICouponService;
+import com.teatime.utils.RedisFallback;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -45,8 +46,9 @@ public class CouponServiceImpl implements ICouponService {
     flashSaleCoupon.setEndTime(coupon.getEndTime());
     flashSaleCouponService.save(flashSaleCoupon);
 
-    stringRedisTemplate.opsForValue()
-        .set(FLASH_SALE_STOCK_KEY + coupon.getId(), coupon.getStock().toString());
+    RedisFallback.executeVoid(() ->
+        stringRedisTemplate.opsForValue()
+            .set(FLASH_SALE_STOCK_KEY + coupon.getId(), coupon.getStock().toString()));
   }
 
   @Override

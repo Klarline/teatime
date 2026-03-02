@@ -6,6 +6,7 @@ import com.teatime.entity.CouponOrder;
 import com.teatime.repository.CouponOrderRepository;
 import com.teatime.service.IFlashSaleCouponService;
 import com.teatime.service.ICouponOrderService;
+import com.teatime.utils.RedisFallback;
 import com.teatime.utils.RedisIdGenerator;
 import com.teatime.utils.UserHolder;
 import java.time.Duration;
@@ -81,11 +82,19 @@ public class CouponOrderServiceImpl implements ICouponOrderService {
   public Result flashSaleCoupon(Long couponId) {
     Long userId = UserHolder.getUser().getId();
     long orderId = redisIdGenerator.nextId("order");
+    proxy = (ICouponOrderService) AopContext.currentProxy();
 
-    Long result =
-        stringRedisTemplate.execute(FLASH_SALE_SCRIPT, Collections.emptyList(),
+    Long result = RedisFallback.execute(
+        () -> stringRedisTemplate.execute(FLASH_SALE_SCRIPT, Collections.emptyList(),
             String.valueOf(couponId),
-            String.valueOf(userId), String.valueOf(orderId));
+            String.valueOf(userId), String.valueOf(orderId)),
+        () -> null
+    );
+
+    if (result == null) {
+      // Redis unavailable - fallback to synchronous DB-based order creation
+      return flashSaleCouponSync(couponId, userId, orderId);
+    }
 
     int res = result.intValue();
     if (res != 0) {
@@ -96,9 +105,31 @@ public class CouponOrderServiceImpl implements ICouponOrderService {
       };
     }
 
-    proxy = (ICouponOrderService) AopContext.currentProxy();
-
     return Result.ok(orderId);
+  }
+
+  /**
+   * Synchronous flash sale path when Redis is unavailable.
+   * Uses DB for stock check and order creation.
+   */
+  private Result flashSaleCouponSync(Long couponId, Long userId, long orderId) {
+    long count = couponOrderRepository.countByUserIdAndCouponId(userId, couponId);
+    if (count > 0) {
+      return Result.fail("You have already purchased this coupon");
+    }
+
+    CouponOrder couponOrder = new CouponOrder();
+    couponOrder.setId(orderId);
+    couponOrder.setUserId(userId);
+    couponOrder.setCouponId(couponId);
+
+    try {
+      proxy.createCouponOrder(couponOrder);
+      return Result.ok(orderId);
+    } catch (Exception e) {
+      log.error("Flash sale order creation failed", e);
+      return Result.fail("Flash Sale failed");
+    }
   }
 
   private void handleCouponOrder(CouponOrder couponOrder) {

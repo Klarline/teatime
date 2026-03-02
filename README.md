@@ -57,12 +57,13 @@ TeaTime is a microservices-based web application that enables users to discover 
 ### User Management
 - Phone-based authentication with verification codes
 - Redis-backed session management for horizontal scalability
+- **Redis fallback:** In-memory session store when Redis is unavailable (auth remains functional)
 - Daily check-in system using Redis Bitmap for efficient storage
 - User profiles with activity tracking
 
 ### Tea Shop Discovery
 - Browse shops by tea category (Bubble Tea, Matcha Cafes, Traditional Tea Houses, etc.)
-- Geolocation-based search with Redis GEO
+- Geolocation-based search with Redis GEO (DB fallback when Redis unavailable)
 - Distance calculation and proximity sorting
 - Multi-level caching with Cache Aside pattern
 - Shop detail pages with ratings and reviews
@@ -89,6 +90,7 @@ TeaTime is a microservices-based web application that enables users to discover 
 - Atomic operations using Lua scripts
 - One coupon per user enforcement
 - Asynchronous order processing with Redis Streams
+- **Redis fallback:** Synchronous DB-based order creation when Redis is unavailable
 
 ### Geolocation Services
 - Real-time distance calculation
@@ -126,7 +128,7 @@ Redis (healthy) ──┘            │
                                └──> Python AI Service (healthy)
 ```
 
-Services start in dependency order with health checks ensuring reliability.
+Services start in dependency order with health checks ensuring reliability. **Note:** The Java service implements Redis fallback strategies—when Redis is unavailable, the application continues operating with degraded caching (DB fallback) and in-memory session storage.
 
 ## Getting Started
 
@@ -400,6 +402,15 @@ These endpoints are called by the Java service, not directly by the frontend:
 - Decouples order creation from fulfillment
 - Ensures eventual consistency
 
+**Redis Outage Resilience**
+- Graceful degradation when Redis is unavailable
+- Cache operations fall back to database queries
+- Session/auth uses in-memory `FallbackSessionStore` (single-node)
+- Flash sale switches to synchronous DB-based order processing
+- ID generation uses `AtomicLong` fallback
+- Geo search falls back to DB query by type (no distance ordering)
+- See `RedisFallback` utility and `FallbackSessionStore` in codebase
+
 ### Data Consistency
 
 **Atomic Operations**
@@ -416,9 +427,10 @@ These endpoints are called by the Java service, not directly by the frontend:
 
 **Caching Strategy**
 - Shop data cached with logical expiration (30-minute TTL)
-- User sessions in Redis with token-based access
+- User sessions in Redis with token-based access (in-memory fallback when Redis down)
 - Blog likes stored in Redis Sets for O(1) lookup
 - Geolocation data indexed with Redis GEO
+- All Redis operations wrapped with fallback; DB is source of truth
 
 **Database Optimization**
 - Indexed foreign keys for fast joins
@@ -752,6 +764,20 @@ teatime:user:checkin:{userId}:{yyyyMM}        # Check-in bitmap
 stream.orders                                 # Flash sale order queue
 ```
 
+### Redis Fallback Strategy
+
+When Redis is unavailable, the Java service degrades gracefully:
+
+| Component | Fallback Behavior |
+|-----------|-------------------|
+| **CacheClient** | Treats as cache miss; queries DB directly |
+| **Session/Auth** | In-memory `FallbackSessionStore` (data lost on restart) |
+| **Flash Sale** | Synchronous DB-based order creation |
+| **Shop Geo** | DB query by type (no distance ordering) |
+| **Follow/Blog** | DB fallback for common follow; best-effort for likes/feed |
+| **ID Generation** | `AtomicLong` sequence |
+| **Check-in** | Returns "service temporarily unavailable" |
+
 ## Performance Metrics
 
 - **API Response Time:** < 200ms for cached requests
@@ -805,6 +831,12 @@ docker-compose down -v
 - Check Redis connection: `docker-compose logs redis`
 - Verify environment variables in docker-compose.yml
 - Check logs: `docker-compose logs java-service`
+
+**Redis Outage**
+- The Java service continues operating when Redis is down (graceful degradation)
+- Caching falls back to DB; sessions use in-memory store
+- Flash sales work synchronously via DB
+- Restart Redis and the service will resume using it automatically
 
 **Python Service Unhealthy**
 - Verify GOOGLE_API_KEY is set in .env

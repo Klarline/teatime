@@ -7,6 +7,7 @@ import com.teatime.entity.Follow;
 import com.teatime.repository.FollowRepository;
 import com.teatime.service.IFollowService;
 import com.teatime.service.IUserService;
+import com.teatime.utils.RedisFallback;
 import com.teatime.utils.UserHolder;
 import java.util.Collections;
 import java.util.List;
@@ -51,11 +52,13 @@ public class FollowServiceImpl implements IFollowService {
       follow.setFollowUserId(followUserId);
       Follow saved = followRepository.save(follow);
       if (saved != null) {
-        stringRedisTemplate.opsForSet().add(key, followUserId.toString());
+        RedisFallback.executeVoid(() ->
+            stringRedisTemplate.opsForSet().add(key, followUserId.toString()));
       }
     } else {
       followRepository.deleteByUserIdAndFollowUserId(userId, followUserId);
-      stringRedisTemplate.opsForSet().remove(key, followUserId.toString());
+      RedisFallback.executeVoid(() ->
+          stringRedisTemplate.opsForSet().remove(key, followUserId.toString()));
     }
     return Result.ok();
   }
@@ -63,10 +66,25 @@ public class FollowServiceImpl implements IFollowService {
   @Override
   public Result commonFollow(Long id) {
     Long userId = UserHolder.getUser().getId();
-    String key1 = "follows:" + userId;
-    String key2 = "follows:" + id;
 
-    Set<String> intersect = stringRedisTemplate.opsForSet().intersect(key1, key2);
+    Set<String> intersect = RedisFallback.execute(
+        () -> {
+          String key1 = "follows:" + userId;
+          String key2 = "follows:" + id;
+          return stringRedisTemplate.opsForSet().intersect(key1, key2);
+        },
+        () -> {
+          // Fallback to DB: get both users' follow lists and intersect in memory
+          List<Follow> myFollows = followRepository.findByUserId(userId);
+          List<Follow> theirFollows = followRepository.findByUserId(id);
+          Set<Long> mySet = myFollows.stream().map(Follow::getFollowUserId).collect(Collectors.toSet());
+          return theirFollows.stream()
+              .map(Follow::getFollowUserId)
+              .filter(mySet::contains)
+              .map(Object::toString)
+              .collect(Collectors.toSet());
+        }
+    );
 
     if (intersect == null || intersect.isEmpty()) {
       return Result.ok(Collections.emptyList());

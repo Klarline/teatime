@@ -16,6 +16,8 @@ import com.teatime.dto.UserDTO;
 import com.teatime.entity.User;
 import com.teatime.repository.UserRepository;
 import com.teatime.service.IUserService;
+import com.teatime.utils.FallbackSessionStore;
+import com.teatime.utils.RedisFallback;
 import com.teatime.utils.RegexUtils;
 import com.teatime.utils.UserHolder;
 import java.time.LocalDateTime;
@@ -51,8 +53,11 @@ public class UserServiceImpl implements IUserService {
     }
 
     String code = RandomUtil.randomString(6);
-    stringRedisTemplate.opsForValue()
-        .set(LOGIN_CODE_KEY + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
+    RedisFallback.executeWithStatus(
+        () -> stringRedisTemplate.opsForValue()
+            .set(LOGIN_CODE_KEY + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES),
+        () -> FallbackSessionStore.setLoginCode(phone, code)
+    );
     return Result.ok();
   }
 
@@ -63,9 +68,15 @@ public class UserServiceImpl implements IUserService {
       return Result.fail("Phone number format is invalid");
     }
 
-    Object cacheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
+    String cacheCode = RedisFallback.execute(
+        () -> {
+          Object v = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
+          return v != null ? v.toString() : null;
+        },
+        () -> FallbackSessionStore.getLoginCode(phone)
+    );
     String code = loginForm.getCode();
-    if (cacheCode == null || !cacheCode.toString().equals(code)) {
+    if (cacheCode == null || !cacheCode.equals(code)) {
       return Result.fail("Verification code is incorrect");
     }
 
@@ -80,8 +91,14 @@ public class UserServiceImpl implements IUserService {
         BeanUtil.beanToMap(userDTO, new HashMap<>(),
             CopyOptions.create().setIgnoreNullValue(true)
                 .setFieldValueEditor((fieldName, fieldValue) -> fieldValue.toString()));
-    stringRedisTemplate.opsForHash().putAll(LOGIN_USER_KEY + token, userMap);
-    stringRedisTemplate.expire(LOGIN_USER_KEY + token, LOGIN_USER_TTL, TimeUnit.SECONDS);
+    Map<Object, Object> userMapObj = new HashMap<>(userMap);
+    RedisFallback.executeWithStatus(
+        () -> {
+          stringRedisTemplate.opsForHash().putAll(LOGIN_USER_KEY + token, userMapObj);
+          stringRedisTemplate.expire(LOGIN_USER_KEY + token, LOGIN_USER_TTL, TimeUnit.SECONDS);
+        },
+        () -> FallbackSessionStore.setSession(token, userMapObj)
+    );
 
     return Result.ok(token);
   }
@@ -93,7 +110,16 @@ public class UserServiceImpl implements IUserService {
     String keySuffix = now.format(DateTimeFormatter.ofPattern("yyyyMM"));
     String key = USER_CHECKIN_KEY + user.getId() + keySuffix;
     int dayOfMonth = now.getDayOfMonth();
-    stringRedisTemplate.opsForValue().setBit(key, dayOfMonth - 1, true);
+    boolean success = RedisFallback.execute(
+        () -> {
+          stringRedisTemplate.opsForValue().setBit(key, dayOfMonth - 1, true);
+          return true;
+        },
+        () -> false
+    );
+    if (!success) {
+      return Result.fail("Check-in service temporarily unavailable");
+    }
     return Result.ok();
   }
 
@@ -105,9 +131,12 @@ public class UserServiceImpl implements IUserService {
     String key = USER_CHECKIN_KEY + user.getId() + keySuffix;
     int dayOfMonth = now.getDayOfMonth();
 
-    List<Long> result = stringRedisTemplate.opsForValue()
-        .bitField(key, BitFieldSubCommands.create()
-            .get(BitFieldSubCommands.BitFieldType.unsigned(dayOfMonth)).valueAt(0));
+    List<Long> result = RedisFallback.execute(
+        () -> stringRedisTemplate.opsForValue()
+            .bitField(key, BitFieldSubCommands.create()
+                .get(BitFieldSubCommands.BitFieldType.unsigned(dayOfMonth)).valueAt(0)),
+        () -> null
+    );
     if (result == null || result.isEmpty()) {
       return Result.ok(0);
     }

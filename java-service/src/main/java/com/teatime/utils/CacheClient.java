@@ -29,6 +29,7 @@ public class CacheClient {
   /**
    * Basic cache query method
    * Use for: Non-critical data, low traffic scenarios
+   * Falls back to DB when Redis is unavailable.
    *
    * @param keyPrefix  Redis key prefix
    * @param id         Unique identifier for the data
@@ -41,7 +42,10 @@ public class CacheClient {
   public <R, ID> R query(String keyPrefix, ID id, Class<R> type, Function<ID, R> dbFallBack,
                          Long time, TimeUnit unit) {
     String key = keyPrefix + id;
-    String json = stringRedisTemplate.opsForValue().get(key);
+    String json = RedisFallback.execute(
+        () -> stringRedisTemplate.opsForValue().get(key),
+        () -> null
+    );
 
     if (StrUtil.isNotBlank(json)) {
       return JSONUtil.toBean(json, type);
@@ -51,7 +55,7 @@ public class CacheClient {
     if (r == null) {
       return null;
     }
-    this.set(key, r, time, unit);
+    RedisFallback.executeVoid(() -> this.set(key, r, time, unit));
     return r;
   }
 
@@ -71,8 +75,11 @@ public class CacheClient {
                                         Function<ID, R> dbFallBack, Long time, TimeUnit unit) {
     String key = keyPrefix + id;
 
-    // check Redis cache
-    String json = stringRedisTemplate.opsForValue().get(key);
+    // check Redis cache (falls back to null on Redis outage)
+    String json = RedisFallback.execute(
+        () -> stringRedisTemplate.opsForValue().get(key),
+        () -> null
+    );
     if (StrUtil.isNotBlank(json)) {
       return JSONUtil.toBean(json, type);
     }
@@ -86,13 +93,13 @@ public class CacheClient {
     R r = dbFallBack.apply(id);
     if (r == null) {
       // cache null value to prevent cache penetration
-      stringRedisTemplate.opsForValue()
-          .set(key, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
+      RedisFallback.executeVoid(() -> stringRedisTemplate.opsForValue()
+          .set(key, "", CACHE_NULL_TTL, TimeUnit.MINUTES));
       return null;
     }
 
     // store information in Redis
-    this.set(key, r, time, unit);
+    RedisFallback.executeVoid(() -> this.set(key, r, time, unit));
 
     return r;
   }
@@ -113,8 +120,11 @@ public class CacheClient {
                                   Function<ID, R> dbFallBack, Long time, TimeUnit unit) {
     String key = keyPrefix + id;
 
-    // check Redis cache for information
-    String json = stringRedisTemplate.opsForValue().get(key);
+    // check Redis cache for information (falls back to null on Redis outage)
+    String json = RedisFallback.execute(
+        () -> stringRedisTemplate.opsForValue().get(key),
+        () -> null
+    );
     if (StrUtil.isNotBlank(json)) {
       return JSONUtil.toBean(json, type);
     }
@@ -124,25 +134,30 @@ public class CacheClient {
       return null;
     }
 
-    // implement mutex lock to prevent cache breakdown
-    String lockKey = "lock:" + key;
+    // When Redis is down, skip mutex and go directly to DB (degraded but functional)
+    Boolean lockResult = RedisFallback.execute(() -> tryLock("lock:" + key), () -> false);
+    boolean isLock = BooleanUtil.isTrue(lockResult);
 
-    boolean isLock = tryLock(lockKey);
     if (!isLock) {
-      // did not get the lock, sleep and retry
-      try {
-        Thread.sleep(50);
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
+      // Redis down or lock contention - fallback: query DB directly without cache
+      R r = dbFallBack.apply(id);
+      if (r != null) {
+        RedisFallback.executeVoid(() -> this.set(key, r, time, unit));
+      } else {
+        RedisFallback.executeVoid(() -> stringRedisTemplate.opsForValue()
+            .set(key, "", CACHE_NULL_TTL, TimeUnit.MINUTES));
       }
-      return queryWithMutex(keyPrefix, id, type, dbFallBack, time, unit);
+      return r;
     }
 
     // Got the lock - proceed with cache rebuild
     R r = null;
     try {
       // Got lock - double check cache (maybe another thread already rebuilt it)
-      json = stringRedisTemplate.opsForValue().get(key);
+      json = RedisFallback.execute(
+          () -> stringRedisTemplate.opsForValue().get(key),
+          () -> null
+      );
       if (StrUtil.isNotBlank(json)) {
         return JSONUtil.toBean(json, type);
       }
@@ -151,16 +166,17 @@ public class CacheClient {
       r = dbFallBack.apply(id);
       if (r == null) {
         // cache null value to prevent cache penetration
-        stringRedisTemplate.opsForValue()
-            .set(key, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
+        RedisFallback.executeVoid(() -> stringRedisTemplate.opsForValue()
+            .set(key, "", CACHE_NULL_TTL, TimeUnit.MINUTES));
         return null;
       }
 
       // store information in Redis
-      this.set(key, r, time, unit);
+      final R resultToCache = r;
+      RedisFallback.executeVoid(() -> this.set(key, resultToCache, time, unit));
     } finally {
       // release lock (only executed when we have the lock)
-      unlock(lockKey);
+      RedisFallback.executeVoid(() -> unlock("lock:" + key));
     }
     return r;
   }
@@ -182,10 +198,13 @@ public class CacheClient {
                                           Function<ID, R> dbFallBack, Long time, TimeUnit unit) {
     String key = keyPrefix + id;
 
-    // Check Redis cache for information
-    String json = stringRedisTemplate.opsForValue().get(key);
+    // Check Redis cache for information (falls back to null on Redis outage)
+    String json = RedisFallback.execute(
+        () -> stringRedisTemplate.opsForValue().get(key),
+        () -> null
+    );
 
-    // Handle cold start (empty cache)
+    // Handle cold start (empty cache) or Redis outage
     if (StrUtil.isBlank(json)) {
       // Query database
       R r = dbFallBack.apply(id);
@@ -196,7 +215,7 @@ public class CacheClient {
       }
 
       // If data exists, set up cache with logical expiration
-      this.setLogicalExpire(key, r, time, unit);
+      RedisFallback.executeVoid(() -> this.setLogicalExpire(key, r, time, unit));
       return r;
     }
 
@@ -212,18 +231,17 @@ public class CacheClient {
 
     // Cache expired - return stale data and refresh asynchronously
     String lockKey = "lock:" + key;
-    boolean isLock = tryLock(lockKey);
+    Boolean lockResult = RedisFallback.execute(() -> tryLock(lockKey), () -> false);
+    boolean isLock = BooleanUtil.isTrue(lockResult);
     if (isLock) {
       CACHE_REBUILD_EXECUTOR.submit(() -> {
         try {
           R r1 = dbFallBack.apply(id);
           // rebuild cache
-          this.setLogicalExpire(key, r1, time, unit);
-        } catch (Exception e) {
-          throw new RuntimeException(e);
+          RedisFallback.executeVoid(() -> this.setLogicalExpire(key, r1, time, unit));
         } finally {
           // release lock
-          unlock(lockKey);
+          RedisFallback.executeVoid(() -> unlock(lockKey));
         }
       });
     }

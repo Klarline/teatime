@@ -4,7 +4,6 @@ import static com.teatime.utils.RedisConstants.CACHE_SHOP_KEY;
 import static com.teatime.utils.RedisConstants.CACHE_SHOP_TTL;
 import static com.teatime.utils.RedisConstants.SHOP_GEO_KEY;
 
-import cn.hutool.core.util.StrUtil;
 import com.teatime.dto.Result;
 import com.teatime.entity.Shop;
 import com.teatime.repository.ShopRepository;
@@ -20,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Resource;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
@@ -136,7 +136,7 @@ public class ShopServiceImpl implements IShopService {
   @Override
   public Result queryShopByName(String name, Integer current) {
     List<Shop> shops;
-    if (StrUtil.isNotBlank(name)) {
+    if (StringUtils.isNotBlank(name)) {
       shops = shopRepository.findByNameContaining(
           name,
           PageRequest.of(current - 1, SystemConstants.MAX_PAGE_SIZE)

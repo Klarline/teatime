@@ -3,7 +3,6 @@ package com.teatime.service.impl;
 import static com.teatime.utils.RedisConstants.BLOG_LIKED_KEY;
 import static com.teatime.utils.RedisConstants.FEED_KEY;
 
-import cn.hutool.core.bean.BeanUtil;
 import com.teatime.dto.Result;
 import com.teatime.dto.UserDTO;
 import com.teatime.dto.ai.ReviewDocument;
@@ -26,6 +25,7 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Resource;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.BeanUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -131,7 +131,11 @@ public class BlogServiceImpl implements IBlogService {
     List<User> users = userService.listByIds(ids);
     users.sort(Comparator.comparingInt(u -> ids.indexOf(u.getId())));
     List<UserDTO> userDTOs = users.stream()
-        .map(user -> BeanUtil.copyProperties(user, UserDTO.class)).toList();
+        .map(user -> {
+          UserDTO dto = new UserDTO();
+          BeanUtils.copyProperties(user, dto);
+          return dto;
+        }).toList();
     return Result.ok(userDTOs);
   }
 

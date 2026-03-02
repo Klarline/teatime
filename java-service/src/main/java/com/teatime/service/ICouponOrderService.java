@@ -13,5 +13,10 @@ public interface ICouponOrderService {
 
   Result flashSaleCoupon(Long couponId);
 
-  void createCouponOrder(CouponOrder couponOrder);
+  /**
+   * Creates a coupon order. Must be called within a transactional context.
+   *
+   * @return true if order was created, false if duplicate purchase or insufficient stock
+   */
+  boolean createCouponOrder(CouponOrder couponOrder);
 }

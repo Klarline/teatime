@@ -6,10 +6,6 @@ import static com.teatime.utils.RedisConstants.LOGIN_USER_KEY;
 import static com.teatime.utils.RedisConstants.LOGIN_USER_TTL;
 import static com.teatime.utils.RedisConstants.USER_CHECKIN_KEY;
 
-import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.bean.copier.CopyOptions;
-import cn.hutool.core.lang.UUID;
-import cn.hutool.core.util.RandomUtil;
 import com.teatime.dto.LoginFormDTO;
 import com.teatime.dto.Result;
 import com.teatime.dto.UserDTO;
@@ -25,9 +21,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -52,7 +51,7 @@ public class UserServiceImpl implements IUserService {
       return Result.fail("Phone number format is invalid");
     }
 
-    String code = RandomUtil.randomString(6);
+    String code = RandomStringUtils.randomAlphanumeric(6);
     RedisFallback.executeWithStatus(
         () -> stringRedisTemplate.opsForValue()
             .set(LOGIN_CODE_KEY + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES),
@@ -85,13 +84,10 @@ public class UserServiceImpl implements IUserService {
       user = createUserWithPhone(phone);
     }
 
-    String token = UUID.randomUUID().toString(true);
-    UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
-    Map<String, Object> userMap =
-        BeanUtil.beanToMap(userDTO, new HashMap<>(),
-            CopyOptions.create().setIgnoreNullValue(true)
-                .setFieldValueEditor((fieldName, fieldValue) -> fieldValue.toString()));
-    Map<Object, Object> userMapObj = new HashMap<>(userMap);
+    String token = UUID.randomUUID().toString().replace("-", "");
+    UserDTO userDTO = new UserDTO();
+    BeanUtils.copyProperties(user, userDTO);
+    Map<Object, Object> userMapObj = userDtoToRedisHash(userDTO);
     RedisFallback.executeWithStatus(
         () -> {
           stringRedisTemplate.opsForHash().putAll(LOGIN_USER_KEY + token, userMapObj);
@@ -172,8 +168,22 @@ public class UserServiceImpl implements IUserService {
   private User createUserWithPhone(String phone) {
     User user = new User();
     user.setPhone(phone);
-    user.setNickName("USER_" + RandomUtil.randomString(10));
+    user.setNickName("USER_" + RandomStringUtils.randomAlphanumeric(10));
     userRepository.save(user);
     return user;
+  }
+
+  private static Map<Object, Object> userDtoToRedisHash(UserDTO dto) {
+    Map<Object, Object> map = new HashMap<>();
+    if (dto.getId() != null) {
+      map.put("id", dto.getId().toString());
+    }
+    if (dto.getNickName() != null) {
+      map.put("nickName", dto.getNickName());
+    }
+    if (dto.getIcon() != null) {
+      map.put("icon", dto.getIcon());
+    }
+    return map;
   }
 }

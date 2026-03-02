@@ -15,6 +15,7 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 
@@ -115,8 +116,10 @@ class CouponOrderServiceTest {
     UserDTO currentUser = new UserDTO();
     currentUser.setId(userId);
 
-    try (MockedStatic<UserHolder> userHolderMock = mockStatic(UserHolder.class)) {
+    try (MockedStatic<UserHolder> userHolderMock = mockStatic(UserHolder.class);
+         MockedStatic<AopContext> aopMock = mockStatic(AopContext.class)) {
       userHolderMock.when(UserHolder::getUser).thenReturn(currentUser);
+      aopMock.when(AopContext::currentProxy).thenReturn(couponOrderService);
 
       Result result = couponOrderService.flashSaleCoupon(couponId);
 
@@ -148,8 +151,10 @@ class CouponOrderServiceTest {
     UserDTO currentUser = new UserDTO();
     currentUser.setId(userId);
 
-    try (MockedStatic<UserHolder> userHolderMock = mockStatic(UserHolder.class)) {
+    try (MockedStatic<UserHolder> userHolderMock = mockStatic(UserHolder.class);
+         MockedStatic<AopContext> aopMock = mockStatic(AopContext.class)) {
       userHolderMock.when(UserHolder::getUser).thenReturn(currentUser);
+      aopMock.when(AopContext::currentProxy).thenReturn(couponOrderService);
 
       Result result = couponOrderService.flashSaleCoupon(couponId);
 
@@ -181,13 +186,92 @@ class CouponOrderServiceTest {
     UserDTO currentUser = new UserDTO();
     currentUser.setId(userId);
 
-    try (MockedStatic<UserHolder> userHolderMock = mockStatic(UserHolder.class)) {
+    try (MockedStatic<UserHolder> userHolderMock = mockStatic(UserHolder.class);
+         MockedStatic<AopContext> aopMock = mockStatic(AopContext.class)) {
       userHolderMock.when(UserHolder::getUser).thenReturn(currentUser);
+      aopMock.when(AopContext::currentProxy).thenReturn(couponOrderService);
 
       Result result = couponOrderService.flashSaleCoupon(couponId);
 
       assertFalse(result.getSuccess());
       assertEquals("Flash Sale failed", result.getErrorMsg());
+    }
+  }
+
+  /**
+   * Test 4b: flashSaleCoupon - Redis down, sync path succeeds
+   */
+  @Test
+  @SuppressWarnings("unchecked")
+  void testFlashSaleCoupon_RedisDown_UsesSyncPath_Success() {
+    Long couponId = 1L;
+    Long userId = 100L;
+    long orderId = 123456L;
+
+    when(redisIdGenerator.nextId("order")).thenReturn(orderId);
+    when(stringRedisTemplate.execute(
+        any(RedisScript.class),
+        anyList(),
+        anyString(),
+        anyString(),
+        anyString()
+    )).thenThrow(new DataAccessException("Connection refused") {});
+
+    when(couponOrderRepository.countByUserIdAndCouponId(userId, couponId)).thenReturn(0L);
+    when(flashSaleCouponService.decrementStock(couponId)).thenReturn(true);
+
+    UserDTO currentUser = new UserDTO();
+    currentUser.setId(userId);
+
+    try (MockedStatic<UserHolder> userHolderMock = mockStatic(UserHolder.class);
+         MockedStatic<AopContext> aopMock = mockStatic(AopContext.class)) {
+      userHolderMock.when(UserHolder::getUser).thenReturn(currentUser);
+      aopMock.when(AopContext::currentProxy).thenReturn(couponOrderService);
+
+      Result result = couponOrderService.flashSaleCoupon(couponId);
+
+      assertTrue(result.getSuccess());
+      assertEquals(orderId, result.getData());
+      verify(couponOrderRepository).save(argThat(order ->
+          order.getUserId().equals(userId) && order.getCouponId().equals(couponId)));
+    }
+  }
+
+  /**
+   * Test 4c: flashSaleCoupon - Redis down, sync path insufficient stock
+   */
+  @Test
+  @SuppressWarnings("unchecked")
+  void testFlashSaleCoupon_RedisDown_UsesSyncPath_InsufficientStock() {
+    Long couponId = 1L;
+    Long userId = 100L;
+    long orderId = 123456L;
+
+    when(redisIdGenerator.nextId("order")).thenReturn(orderId);
+    when(stringRedisTemplate.execute(
+        any(RedisScript.class),
+        anyList(),
+        anyString(),
+        anyString(),
+        anyString()
+    )).thenThrow(new DataAccessException("Connection refused") {});
+
+    when(couponOrderRepository.countByUserIdAndCouponId(userId, couponId)).thenReturn(0L);
+    when(flashSaleCouponService.decrementStock(couponId)).thenReturn(false);
+
+    UserDTO currentUser = new UserDTO();
+    currentUser.setId(userId);
+
+    try (MockedStatic<UserHolder> userHolderMock = mockStatic(UserHolder.class);
+         MockedStatic<AopContext> aopMock = mockStatic(AopContext.class)) {
+      userHolderMock.when(UserHolder::getUser).thenReturn(currentUser);
+      aopMock.when(AopContext::currentProxy).thenReturn(couponOrderService);
+
+      Result result = couponOrderService.flashSaleCoupon(couponId);
+
+      assertFalse(result.getSuccess());
+      assertEquals("Insufficient stock", result.getErrorMsg());
+      verify(couponOrderRepository, never()).save(any());
     }
   }
 
@@ -203,8 +287,9 @@ class CouponOrderServiceTest {
     when(couponOrderRepository.countByUserIdAndCouponId(100L, 1L)).thenReturn(0L);
     when(flashSaleCouponService.decrementStock(1L)).thenReturn(true);
 
-    couponOrderService.createCouponOrder(order);
+    boolean result = couponOrderService.createCouponOrder(order);
 
+    assertTrue(result);
     verify(couponOrderRepository).save(order);
     verify(flashSaleCouponService).decrementStock(1L);
   }
@@ -220,8 +305,9 @@ class CouponOrderServiceTest {
 
     when(couponOrderRepository.countByUserIdAndCouponId(100L, 1L)).thenReturn(1L);
 
-    couponOrderService.createCouponOrder(order);
+    boolean result = couponOrderService.createCouponOrder(order);
 
+    assertFalse(result);
     verify(couponOrderRepository, never()).save(any());
     verify(flashSaleCouponService, never()).decrementStock(anyLong());
   }
@@ -238,8 +324,9 @@ class CouponOrderServiceTest {
     when(couponOrderRepository.countByUserIdAndCouponId(100L, 1L)).thenReturn(0L);
     when(flashSaleCouponService.decrementStock(1L)).thenReturn(false);
 
-    couponOrderService.createCouponOrder(order);
+    boolean result = couponOrderService.createCouponOrder(order);
 
+    assertFalse(result);
     verify(couponOrderRepository, never()).save(any());
   }
 

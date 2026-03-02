@@ -5,23 +5,25 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import cn.hutool.core.lang.UUID;
 import com.teatime.dto.LoginFormDTO;
 import com.teatime.dto.Result;
 import com.teatime.dto.UserDTO;
 import com.teatime.entity.User;
 import com.teatime.repository.UserRepository;
 import com.teatime.service.impl.UserServiceImpl;
+import com.teatime.utils.FallbackSessionStore;
 import com.teatime.utils.RegexUtils;
 import com.teatime.utils.UserHolder;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -74,6 +76,28 @@ class UserServiceTest {
   }
 
   /**
+   * Test 1b: Send code when Redis is down - uses FallbackSessionStore
+   */
+  @Test
+  void testSendCode_RedisDown_UsesFallbackSessionStore() {
+    String phone = "6045558888";
+
+    when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+    doThrow(new DataAccessException("Connection refused") {})
+        .when(valueOperations).set(anyString(), anyString(), anyLong(), eq(TimeUnit.MINUTES));
+
+    try (MockedStatic<RegexUtils> regexUtils = mockStatic(RegexUtils.class)) {
+      regexUtils.when(() -> RegexUtils.isPhoneInvalid(phone)).thenReturn(false);
+
+      Result result = userService.sendCode(phone, session);
+
+      assertTrue(result.getSuccess());
+      assertNotNull(FallbackSessionStore.getLoginCode(phone));
+      assertEquals(6, FallbackSessionStore.getLoginCode(phone).length());
+    }
+  }
+
+  /**
    * Test 2: Send code with invalid phone number - should fail
    */
   @Test
@@ -119,17 +143,17 @@ class UserServiceTest {
       regexUtils.when(() -> RegexUtils.isPhoneInvalid(anyString())).thenReturn(false);
 
       UUID mockUuid = mock(UUID.class);
-      when(mockUuid.toString(true)).thenReturn("test-token-123");
-      uuidMock.when(() -> UUID.randomUUID()).thenReturn(mockUuid);
+      when(mockUuid.toString()).thenReturn("testtoken123");
+      uuidMock.when(UUID::randomUUID).thenReturn(mockUuid);
 
       Result result = userService.login(loginForm, session);
 
       assertTrue(result.getSuccess());
-      assertEquals("test-token-123", result.getData());
+      assertEquals("testtoken123", result.getData());
 
-      verify(hashOperations).putAll(eq(LOGIN_USER_KEY + "test-token-123"), anyMap());
+      verify(hashOperations).putAll(eq(LOGIN_USER_KEY + "testtoken123"), anyMap());
       verify(stringRedisTemplate).expire(
-          eq(LOGIN_USER_KEY + "test-token-123"),
+          eq(LOGIN_USER_KEY + "testtoken123"),
           eq(LOGIN_USER_TTL),
           eq(TimeUnit.SECONDS)
       );
@@ -158,6 +182,48 @@ class UserServiceTest {
       assertFalse(result.getSuccess());
       assertEquals("Verification code is incorrect", result.getErrorMsg());
       verify(userRepository, never()).findByPhone(any());
+    }
+  }
+
+  /**
+   * Test 4b: Login when Redis is down - uses FallbackSessionStore for code
+   */
+  @Test
+  void testLogin_RedisDown_UsesFallbackSessionStore() {
+    LoginFormDTO loginForm = new LoginFormDTO();
+    loginForm.setPhone("6045557777");
+    loginForm.setCode("111222");
+
+    FallbackSessionStore.setLoginCode(loginForm.getPhone(), loginForm.getCode());
+
+    when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+    when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
+    when(valueOperations.get(LOGIN_CODE_KEY + loginForm.getPhone()))
+        .thenThrow(new DataAccessException("Connection refused") {});
+
+    User existingUser = new User();
+    existingUser.setId(2L);
+    existingUser.setPhone(loginForm.getPhone());
+    existingUser.setNickName("RedisDownUser");
+
+    when(userRepository.findByPhone(anyString())).thenReturn(Optional.of(existingUser));
+
+    try (MockedStatic<RegexUtils> regexUtils = mockStatic(RegexUtils.class);
+         MockedStatic<UUID> uuidMock = mockStatic(UUID.class)) {
+      regexUtils.when(() -> RegexUtils.isPhoneInvalid(anyString())).thenReturn(false);
+
+      UUID mockUuid = mock(UUID.class);
+      when(mockUuid.toString()).thenReturn("fallbacktoken");
+      uuidMock.when(UUID::randomUUID).thenReturn(mockUuid);
+
+      doThrow(new DataAccessException("Connection refused") {})
+          .when(hashOperations).putAll(anyString(), anyMap());
+
+      Result result = userService.login(loginForm, session);
+
+      assertTrue(result.getSuccess());
+      assertEquals("fallbacktoken", result.getData());
+      assertFalse(FallbackSessionStore.getSession("fallbacktoken").isEmpty());
     }
   }
 
@@ -214,17 +280,17 @@ class UserServiceTest {
       regexUtils.when(() -> RegexUtils.isPhoneInvalid(anyString())).thenReturn(false);
 
       UUID mockUuid = mock(UUID.class);
-      when(mockUuid.toString(true)).thenReturn("test-token-456");
-      uuidMock.when(() -> UUID.randomUUID()).thenReturn(mockUuid);
+      when(mockUuid.toString()).thenReturn("testtoken456");
+      uuidMock.when(UUID::randomUUID).thenReturn(mockUuid);
 
       Result result = userService.login(loginForm, session);
 
       assertTrue(result.getSuccess());
-      assertEquals("test-token-456", result.getData());
+      assertEquals("testtoken456", result.getData());
 
       verify(userRepository).save(any(User.class));
 
-      verify(hashOperations).putAll(eq(LOGIN_USER_KEY + "test-token-456"), anyMap());
+      verify(hashOperations).putAll(eq(LOGIN_USER_KEY + "testtoken456"), anyMap());
     }
   }
 

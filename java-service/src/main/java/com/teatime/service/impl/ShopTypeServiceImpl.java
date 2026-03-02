@@ -2,9 +2,9 @@ package com.teatime.service.impl;
 
 import static com.teatime.utils.RedisConstants.CACHE_SHOP_TYPE_KEY;
 
-import cn.hutool.core.util.StrUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.teatime.utils.RedisFallback;
-import cn.hutool.json.JSONUtil;
+import org.apache.commons.lang3.StringUtils;
 import com.teatime.dto.Result;
 import com.teatime.entity.ShopType;
 import com.teatime.repository.ShopTypeRepository;
@@ -22,6 +22,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class ShopTypeServiceImpl implements IShopTypeService {
 
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
   @Resource
   private ShopTypeRepository shopTypeRepository;
 
@@ -36,14 +38,24 @@ public class ShopTypeServiceImpl implements IShopTypeService {
         () -> stringRedisTemplate.opsForValue().get(key),
         () -> null
     );
-    if (StrUtil.isNotBlank(json)) {
-      List<ShopType> typeList = JSONUtil.toList(json, ShopType.class);
-      return Result.ok(typeList);
+    if (StringUtils.isNotBlank(json)) {
+      try {
+        List<ShopType> typeList = OBJECT_MAPPER.readValue(json,
+            OBJECT_MAPPER.getTypeFactory().constructCollectionType(List.class, ShopType.class));
+        return Result.ok(typeList);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to deserialize shop types", e);
+      }
     }
 
     List<ShopType> typeList = shopTypeRepository.findAll(Sort.by(Sort.Direction.ASC, "sort"));
-    RedisFallback.executeVoid(() ->
-        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(typeList)));
+    RedisFallback.executeVoid(() -> {
+      try {
+        stringRedisTemplate.opsForValue().set(key, OBJECT_MAPPER.writeValueAsString(typeList));
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to serialize shop types", e);
+      }
+    });
 
     return Result.ok(typeList);
   }

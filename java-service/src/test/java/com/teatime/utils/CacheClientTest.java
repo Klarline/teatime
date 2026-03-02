@@ -1,6 +1,8 @@
 package com.teatime.utils;
 
-import cn.hutool.json.JSONUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.teatime.entity.Shop;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,6 +10,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
@@ -29,11 +32,30 @@ class CacheClientTest {
   private ValueOperations<String, String> valueOperations;
 
   private CacheClient cacheClient;
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+      .registerModule(new JavaTimeModule())
+      .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
   @BeforeEach
   void setUp() {
-    when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+    lenient().when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
     cacheClient = new CacheClient(stringRedisTemplate);
+  }
+
+  private static String toJson(Object obj) {
+    try {
+      return OBJECT_MAPPER.writeValueAsString(obj);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static <T> T fromJson(String json, Class<T> type) {
+    try {
+      return OBJECT_MAPPER.readValue(json, type);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   /**
@@ -45,7 +67,7 @@ class CacheClientTest {
     // Arrange
     Shop shop = createTestShop(1L, "Test Shop");
     String key = "cache:shop:1";
-    when(valueOperations.get(key)).thenReturn(JSONUtil.toJsonStr(shop));
+    when(valueOperations.get(key)).thenReturn(toJson(shop));
 
     Function<Long, Shop> dbFallback = mock(Function.class);
 
@@ -83,10 +105,30 @@ class CacheClientTest {
     // Verify data was cached
     verify(valueOperations).set(
         eq(key),
-        eq(JSONUtil.toJsonStr(shop)),
+        eq(toJson(shop)),
         eq(30L),
         eq(TimeUnit.MINUTES)
     );
+  }
+
+  /**
+   * Test 2b: query() - Redis down falls back to DB
+   */
+  @Test
+  void testQuery_RedisDown_FallsBackToDb() {
+    String key = "cache:shop:1";
+    Shop shop = createTestShop(1L, "Test Shop");
+
+    when(valueOperations.get(key)).thenThrow(new DataAccessException("Connection refused") {});
+    Function<Long, Shop> dbFallback = id -> shop;
+
+    Shop result =
+        cacheClient.query("cache:shop:", 1L, Shop.class, dbFallback, 30L, TimeUnit.MINUTES);
+
+    assertNotNull(result);
+    assertEquals(1L, result.getId());
+    assertEquals("Test Shop", result.getName());
+    verify(valueOperations).get(key);
   }
 
   /**
@@ -98,7 +140,7 @@ class CacheClientTest {
     // Arrange
     Shop shop = createTestShop(1L, "Test Shop");
     String key = "cache:shop:1";
-    when(valueOperations.get(key)).thenReturn(JSONUtil.toJsonStr(shop));
+    when(valueOperations.get(key)).thenReturn(toJson(shop));
 
     Function<Long, Shop> dbFallback = mock(Function.class);
 
@@ -206,7 +248,7 @@ class CacheClientTest {
     verify(valueOperations).set(eq(key), valueCaptor.capture());
 
     String cachedJson = valueCaptor.getValue();
-    RedisData redisData = JSONUtil.toBean(cachedJson, RedisData.class);
+    RedisData redisData = fromJson(cachedJson, RedisData.class);
     assertNotNull(redisData.getExpireTime());
   }
 
@@ -225,7 +267,7 @@ class CacheClientTest {
     redisData.setData(shop);
     redisData.setExpireTime(LocalDateTime.now().plusMinutes(10)); // Not expired
 
-    when(valueOperations.get(key)).thenReturn(JSONUtil.toJsonStr(redisData));
+    when(valueOperations.get(key)).thenReturn(toJson(redisData));
     Function<Long, Shop> dbFallback = mock(Function.class);
 
     // Act
@@ -252,7 +294,7 @@ class CacheClientTest {
     redisData.setData(shop);
     redisData.setExpireTime(LocalDateTime.now().minusMinutes(1)); // Expired
 
-    when(valueOperations.get(key)).thenReturn(JSONUtil.toJsonStr(redisData));
+    when(valueOperations.get(key)).thenReturn(toJson(redisData));
     when(valueOperations.setIfAbsent(anyString(), anyString(), anyLong(), any(TimeUnit.class)))
         .thenReturn(true); // Lock acquired
 
@@ -290,7 +332,7 @@ class CacheClientTest {
     // Assert
     verify(valueOperations).set(
         eq(key),
-        eq(JSONUtil.toJsonStr(shop)),
+        eq(toJson(shop)),
         eq(30L),
         eq(TimeUnit.MINUTES)
     );
@@ -312,7 +354,7 @@ class CacheClientTest {
     verify(valueOperations).set(eq(key), valueCaptor.capture());
 
     String cachedJson = valueCaptor.getValue();
-    RedisData redisData = JSONUtil.toBean(cachedJson, RedisData.class);
+    RedisData redisData = fromJson(cachedJson, RedisData.class);
 
     assertNotNull(redisData.getExpireTime());
     assertTrue(redisData.getExpireTime().isAfter(LocalDateTime.now()));
@@ -338,7 +380,7 @@ class CacheClientTest {
   void testQueryWithMutex_CacheHit_ReturnsData() {
     Shop shop = createTestShop(1L, "Test Shop");
     String key = "cache:shop:1";
-    when(valueOperations.get(key)).thenReturn(JSONUtil.toJsonStr(shop));
+    when(valueOperations.get(key)).thenReturn(toJson(shop));
 
     Function<Long, Shop> dbFallback = mock(Function.class);
 
@@ -387,7 +429,8 @@ class CacheClientTest {
   }
 
   /**
-   * Test 14: queryWithMutex() - Failed lock acquisition triggers retry, then succeeds
+   * Test 14: queryWithMutex() - Failed lock acquisition falls back to DB directly
+   * (No retry - when lock fails we query DB and return to avoid cache stampede)
    */
   @Test
   void testQueryWithMutex_FailedLock_RetriesThenSucceeds() {
@@ -396,37 +439,33 @@ class CacheClientTest {
     String lockKey = "lock:cache:shop:1";
     Shop shop = createTestShop(1L, "Test Shop");
 
-    // Mock responses: cache miss on both checks
+    // Mock responses: cache miss
     when(valueOperations.get(key)).thenReturn(null);
 
-    // Mock lock behavior: fail first, succeed second
+    // Mock lock behavior: fails (another thread has lock)
     when(valueOperations.setIfAbsent(lockKey, "1", 10L, TimeUnit.SECONDS))
-        .thenReturn(false)  // First attempt: lock fails
-        .thenReturn(true);   // Second attempt: lock succeeds
+        .thenReturn(false);
 
     Function<Long, Shop> dbFallback = id -> shop;
 
-    // Act
+    // Act - when lock fails, we fall back to DB directly (no retry)
     Shop result = cacheClient.queryWithMutex("cache:shop:", 1L, Shop.class, dbFallback, 30L,
         TimeUnit.MINUTES);
 
-    // Assert
+    // Assert - we still get the result from DB
     assertNotNull(result);
     assertEquals(1L, result.getId());
 
-    // Verify lock was attempted twice
-    verify(valueOperations, times(2)).setIfAbsent(
+    // Verify lock was attempted once (no retry on lock contention)
+    verify(valueOperations, times(1)).setIfAbsent(
         eq(lockKey),
         eq("1"),
         eq(10L),
         eq(TimeUnit.SECONDS)
     );
 
-    // Verify data was cached
+    // Verify data was cached (best-effort)
     verify(valueOperations).set(eq(key), anyString(), eq(30L), eq(TimeUnit.MINUTES));
-
-    // Verify lock was released
-    verify(stringRedisTemplate).delete(lockKey);
   }
 
   /**

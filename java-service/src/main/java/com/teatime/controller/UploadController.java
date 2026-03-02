@@ -1,16 +1,16 @@
 package com.teatime.controller;
 
-import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.util.StrUtil;
 import com.teatime.dto.Result;
 import com.teatime.utils.SystemConstants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.UUID;
 
 @Slf4j
@@ -58,24 +58,31 @@ public class UploadController {
     if (file.isDirectory()) {
       return Result.fail("wrong file name");
     }
-    FileUtil.del(file);
+    try {
+      Files.deleteIfExists(file.toPath());
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to delete file", e);
+    }
     return Result.ok();
   }
 
   private String createNewFileName(String originalFilename) {
     // get suffix
-    String suffix = StrUtil.subAfter(originalFilename, ".", true);
+    String suffix = StringUtils.substringAfterLast(originalFilename, ".");
+    if (StringUtils.isBlank(suffix)) {
+      suffix = "jpg";
+    }
     // generate directory path
     String name = UUID.randomUUID().toString();
     int hash = name.hashCode();
     int d1 = hash & 0xF;
     int d2 = (hash >> 4) & 0xF;
     // create directory if not exists
-    File dir = new File(getImageUploadDir(), StrUtil.format("/blogs/{}/{}", d1, d2));
+    File dir = new File(getImageUploadDir(), String.format("/blogs/%d/%d", d1, d2));
     if (!dir.exists()) {
       dir.mkdirs();
     }
     // return new filename with path
-    return StrUtil.format("/blogs/{}/{}/{}.{}", d1, d2, name, suffix);
+    return String.format("/blogs/%d/%d/%s.%s", d1, d2, name, suffix);
   }
 }

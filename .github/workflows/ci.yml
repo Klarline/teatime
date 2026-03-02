@@ -51,6 +51,9 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
           cache: maven
+
+      - name: Verify Java version
+        run: java -version && echo "JAVA_HOME=$JAVA_HOME"
       
       - name: Run backend tests
         working-directory: ./java-service

@@ -1,9 +1,10 @@
 package com.teatime.utils;
 
-import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.util.StrUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.teatime.dto.UserDTO;
+import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import java.util.concurrent.TimeUnit;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -12,6 +13,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 public class RefreshTokenInterceptor implements HandlerInterceptor {
 
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private StringRedisTemplate stringRedisTemplate;
 
   public RefreshTokenInterceptor(StringRedisTemplate stringRedisTemplate) {
@@ -23,7 +25,7 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
       throws Exception {
     // get token from request header
     String token = request.getHeader("authorization");
-    if (StrUtil.isBlank(token)) {
+    if (StringUtils.isBlank(token)) {
       return true;
     }
 
@@ -35,10 +37,12 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
     if (userMap == null || userMap.isEmpty()) {
       return true;
     }
-    UserDTO userDTO = BeanUtil.fillBeanWithMap(userMap, new UserDTO(), false);
+    Map<String, Object> stringKeyMap = new HashMap<>();
+    userMap.forEach((k, v) -> stringKeyMap.put(k.toString(), v));
+    UserDTO userDTO = OBJECT_MAPPER.convertValue(stringKeyMap, UserDTO.class);
 
     // save user information to ThreadLocal
-    UserHolder.saveUser((UserDTO) userDTO);
+    UserHolder.saveUser(userDTO);
 
     // refresh token expiration time
     RedisFallback.executeWithStatus(

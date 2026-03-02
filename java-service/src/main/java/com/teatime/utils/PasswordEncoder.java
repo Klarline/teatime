@@ -1,7 +1,7 @@
 package com.teatime.utils;
 
 
-import cn.hutool.core.util.RandomUtil;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.util.DigestUtils;
 
 import java.nio.charset.StandardCharsets;
@@ -10,7 +10,7 @@ public class PasswordEncoder {
 
   public static String encode(String password) {
     // generate salt
-    String salt = RandomUtil.randomString(20);
+    String salt = RandomStringUtils.randomAlphanumeric(20);
     // encode password with salt
     return encode(password, salt);
   }

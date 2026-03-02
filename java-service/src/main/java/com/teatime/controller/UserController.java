@@ -1,7 +1,6 @@
 package com.teatime.controller;
 
 
-import cn.hutool.core.bean.BeanUtil;
 import com.teatime.dto.LoginFormDTO;
 import com.teatime.dto.Result;
 import com.teatime.dto.UserDTO;
@@ -11,6 +10,7 @@ import com.teatime.service.IUserInfoService;
 import com.teatime.service.IUserService;
 import com.teatime.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -98,7 +98,8 @@ public class UserController {
     if (user == null) {
       return Result.ok();
     }
-    UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+    UserDTO userDTO = new UserDTO();
+    BeanUtils.copyProperties(user, userDTO);
     return Result.ok(userDTO);
   }
 

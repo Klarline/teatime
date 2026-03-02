@@ -1,6 +1,7 @@
 package com.teatime.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.teatime.dto.Result;
 import com.teatime.dto.ai.ReviewDocument;
 import com.teatime.entity.Shop;
@@ -29,6 +30,8 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class ShopReviewServiceImpl implements IShopReviewService {
+
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   @Resource
   private ShopReviewRepository shopReviewRepository;
@@ -98,7 +101,8 @@ public class ShopReviewServiceImpl implements IShopReviewService {
     ).getContent();
 
     List<Map<String, Object>> enrichedReviews = reviews.stream().map(review -> {
-      Map<String, Object> reviewMap = BeanUtil.beanToMap(review);
+      Map<String, Object> reviewMap = OBJECT_MAPPER.convertValue(review,
+          new TypeReference<Map<String, Object>>() {});
 
       User user = userRepository.findById(review.getUserId()).orElse(null);
       if (user != null) {

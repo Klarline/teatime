@@ -1,6 +1,6 @@
 package com.teatime.utils;
 
-import cn.hutool.core.util.StrUtil;
+import org.apache.commons.lang3.StringUtils;
 
 public class RegexUtils {
 
@@ -19,7 +19,7 @@ public class RegexUtils {
   }
 
   private static boolean mismatch(String str, String regex) {
-    if (StrUtil.isBlank(str)) {
+    if (StringUtils.isBlank(str)) {
       return true;
     }
     return !str.matches(regex);

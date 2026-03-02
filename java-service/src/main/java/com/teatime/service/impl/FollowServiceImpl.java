@@ -1,6 +1,5 @@
 package com.teatime.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
 import com.teatime.dto.Result;
 import com.teatime.dto.UserDTO;
 import com.teatime.entity.Follow;
@@ -14,6 +13,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -92,7 +92,11 @@ public class FollowServiceImpl implements IFollowService {
 
     List<Long> ids = intersect.stream().map(Long::valueOf).collect(Collectors.toList());
     List<UserDTO> users = userService.listByIds(ids).stream()
-        .map(user -> BeanUtil.copyProperties(user, UserDTO.class)).collect(Collectors.toList());
+        .map(user -> {
+          UserDTO dto = new UserDTO();
+          BeanUtils.copyProperties(user, dto);
+          return dto;
+        }).collect(Collectors.toList());
 
     return Result.ok(users);
   }

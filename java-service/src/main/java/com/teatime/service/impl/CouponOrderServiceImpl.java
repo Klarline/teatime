@@ -1,6 +1,6 @@
 package com.teatime.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.teatime.dto.Result;
 import com.teatime.entity.CouponOrder;
 import com.teatime.repository.CouponOrderRepository;
@@ -12,6 +12,7 @@ import com.teatime.utils.UserHolder;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -45,6 +46,7 @@ public class CouponOrderServiceImpl implements ICouponOrderService {
   private static final DefaultRedisScript<Long> FLASH_SALE_SCRIPT;
   private static final ExecutorService FLASH_SALE_ORDER_EXECUTOR =
       Executors.newSingleThreadExecutor();
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   static {
     FLASH_SALE_SCRIPT = new DefaultRedisScript<>();
@@ -123,13 +125,11 @@ public class CouponOrderServiceImpl implements ICouponOrderService {
     couponOrder.setUserId(userId);
     couponOrder.setCouponId(couponId);
 
-    try {
-      proxy.createCouponOrder(couponOrder);
-      return Result.ok(orderId);
-    } catch (Exception e) {
-      log.error("Flash sale order creation failed", e);
-      return Result.fail("Flash Sale failed");
+    boolean created = proxy.createCouponOrder(couponOrder);
+    if (!created) {
+      return Result.fail("Insufficient stock");
     }
+    return Result.ok(orderId);
   }
 
   private void handleCouponOrder(CouponOrder couponOrder) {
@@ -149,22 +149,23 @@ public class CouponOrderServiceImpl implements ICouponOrderService {
 
   @Override
   @Transactional
-  public void createCouponOrder(CouponOrder couponOrder) {
+  public boolean createCouponOrder(CouponOrder couponOrder) {
     Long userId = couponOrder.getUserId();
     long count = couponOrderRepository.countByUserIdAndCouponId(userId, couponOrder.getCouponId());
     if (count > 0) {
       log.error("User {} has already purchased coupon {}", userId,
           couponOrder.getCouponId());
-      return;
+      return false;
     }
 
     boolean success = flashSaleCouponService.decrementStock(couponOrder.getCouponId());
     if (!success) {
       log.error("Insufficient stock for coupon");
-      return;
+      return false;
     }
 
     couponOrderRepository.save(couponOrder);
+    return true;
   }
 
   private class CouponOrderHandler implements Runnable {
@@ -187,7 +188,7 @@ public class CouponOrderServiceImpl implements ICouponOrderService {
 
           MapRecord<String, Object, Object> record = list.get(0);
           Map<Object, Object> values = record.getValue();
-          CouponOrder couponOrder = BeanUtil.fillBeanWithMap(values, new CouponOrder(), true);
+          CouponOrder couponOrder = mapToCouponOrder(values);
           handleCouponOrder(couponOrder);
 
           stringRedisTemplate.opsForStream().acknowledge(queueName, "g1", record.getId());
@@ -214,7 +215,7 @@ public class CouponOrderServiceImpl implements ICouponOrderService {
 
           MapRecord<String, Object, Object> record = list.get(0);
           Map<Object, Object> values = record.getValue();
-          CouponOrder couponOrder = BeanUtil.fillBeanWithMap(values, new CouponOrder(), true);
+          CouponOrder couponOrder = mapToCouponOrder(values);
           handleCouponOrder(couponOrder);
 
           stringRedisTemplate.opsForStream().acknowledge(queueName, "g1", record.getId());
@@ -227,6 +228,12 @@ public class CouponOrderServiceImpl implements ICouponOrderService {
           }
         }
       }
+    }
+
+    private CouponOrder mapToCouponOrder(Map<Object, Object> values) {
+      Map<String, Object> stringKeyMap = new HashMap<>();
+      values.forEach((k, v) -> stringKeyMap.put(k.toString(), v));
+      return OBJECT_MAPPER.convertValue(stringKeyMap, CouponOrder.class);
     }
   }
 }

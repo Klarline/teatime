@@ -1,6 +1,5 @@
 package com.teatime.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.teatime.entity.FlashSaleCoupon;
 
 /**
@@ -8,6 +7,9 @@ import com.teatime.entity.FlashSaleCoupon;
  * Flash Sale coupon service interface
  * </p>
  */
-public interface IFlashSaleCouponService extends IService<FlashSaleCoupon> {
+public interface IFlashSaleCouponService {
 
+  void save(FlashSaleCoupon flashSaleCoupon);
+
+  boolean decrementStock(Long couponId);
 }

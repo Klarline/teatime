@@ -1,12 +1,10 @@
 package com.teatime.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teatime.dto.Result;
 import com.teatime.dto.UserDTO;
 import com.teatime.entity.Follow;
-import com.teatime.mapper.FollowMapper;
+import com.teatime.repository.FollowRepository;
 import com.teatime.service.IFollowService;
 import com.teatime.service.IUserService;
 import com.teatime.utils.UserHolder;
@@ -25,31 +23,24 @@ import org.springframework.stereotype.Service;
  */
 @Service
 @RequiredArgsConstructor
-public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> implements IFollowService {
+public class FollowServiceImpl implements IFollowService {
 
+  private final FollowRepository followRepository;
   private final StringRedisTemplate stringRedisTemplate;
   private final IUserService userService;
 
-  /**
-   * Check if the current user follows another user
-   *
-   * @param followUserId the ID of the user to check
-   * @return Result indicating whether the current user follows the specified user
-   */
+  @Override
+  public List<Follow> findByFollowUserId(Long followUserId) {
+    return followRepository.findByFollowUserId(followUserId);
+  }
+
   @Override
   public Result isFollowed(Long followUserId) {
     Long userId = UserHolder.getUser().getId();
-    Long count = query().eq("user_id", userId).eq("followed_user_id", followUserId).count();
+    long count = followRepository.countByUserIdAndFollowUserId(userId, followUserId);
     return Result.ok(count > 0);
   }
 
-  /**
-   * Follow or unfollow a user
-   *
-   * @param followUserId the ID of the user to follow or unfollow
-   * @param isFollow     true to follow, false to unfollow
-   * @return Result indicating the success of the operation
-   */
   @Override
   public Result followUser(Long followUserId, Boolean isFollow) {
     Long userId = UserHolder.getUser().getId();
@@ -58,39 +49,23 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
       Follow follow = new Follow();
       follow.setUserId(userId);
       follow.setFollowUserId(followUserId);
-      boolean isSuccess = save(follow);
-
-      if (isSuccess) {
-        // follow success, add to redis set
+      Follow saved = followRepository.save(follow);
+      if (saved != null) {
         stringRedisTemplate.opsForSet().add(key, followUserId.toString());
       }
     } else {
-      // unfollow
-      boolean isSuccess = remove(
-          new QueryWrapper<Follow>().eq("user_id", userId).eq("followed_user_id", followUserId));
-      if (isSuccess) {
-        // unfollow success, remove from redis set
-        stringRedisTemplate.opsForSet().remove(key, followUserId.toString());
-      }
+      followRepository.deleteByUserIdAndFollowUserId(userId, followUserId);
+      stringRedisTemplate.opsForSet().remove(key, followUserId.toString());
     }
     return Result.ok();
   }
 
-  /**
-   * Get common followers between the current user and another user
-   *
-   * @param id the ID of the other user
-   * @return Result containing a list of common followers
-   */
   @Override
   public Result commonFollow(Long id) {
-    // get current user id
     Long userId = UserHolder.getUser().getId();
     String key1 = "follows:" + userId;
-
     String key2 = "follows:" + id;
 
-    // get intersection of two sets
     Set<String> intersect = stringRedisTemplate.opsForSet().intersect(key1, key2);
 
     if (intersect == null || intersect.isEmpty()) {
@@ -98,35 +73,21 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
     }
 
     List<Long> ids = intersect.stream().map(Long::valueOf).collect(Collectors.toList());
-
     List<UserDTO> users = userService.listByIds(ids).stream()
         .map(user -> BeanUtil.copyProperties(user, UserDTO.class)).collect(Collectors.toList());
 
     return Result.ok(users);
   }
 
-  /**
-   * Get the follower count for a user
-   *
-   * @param userId the ID of the user
-   * @return Result containing the follower count
-   */
   @Override
   public Result getFollowerCount(Long userId) {
-    Long count = query().eq("followed_user_id", userId).count();
+    long count = followRepository.countByFollowUserId(userId);
     return Result.ok(count);
   }
 
-  /**
-   * Get the following count for a user
-   *
-   * @param userId the ID of the user
-   * @return Result containing the following count
-   */
   @Override
   public Result getFollowingCount(Long userId) {
-    Long count = query().eq("user_id", userId).count();
+    long count = followRepository.countByUserId(userId);
     return Result.ok(count);
   }
 }
-

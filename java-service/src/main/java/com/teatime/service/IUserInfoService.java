@@ -1,6 +1,5 @@
 package com.teatime.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.teatime.entity.UserInfo;
 
 /**
@@ -8,6 +7,7 @@ import com.teatime.entity.UserInfo;
  * User Info service interface
  * </p>
  */
-public interface IUserInfoService extends IService<UserInfo> {
+public interface IUserInfoService {
 
+  UserInfo getById(Long id);
 }

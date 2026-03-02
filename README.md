@@ -18,7 +18,7 @@ TeaTime is a microservices-based web application that enables users to discover 
 - **Language:** Java 17
 - **Database:** MySQL 8.0
 - **Cache Layer:** Redis 7.x
-- **ORM:** MyBatis-Plus
+- **ORM:** Hibernate (Spring Data JPA)
 - **Build Tool:** Maven 3.6+
 - **Key Libraries:** Redisson (distributed locks), Hutool, Lombok, Spring Boot Actuator
 
@@ -211,10 +211,16 @@ docker-compose exec mysql mysql -u teatime -p
 - Google Gemini API key
 
 #### Java Service
+The Java service requires JDK 17. Newer JDKs (e.g. 21, 25) cause compilation and test failures. If your default Java is not 17:
+
 ```bash
 cd java-service
-mvn spring-boot:run
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)  # macOS
+mvn spring-boot:run   # run the app
+mvn clean test       # run tests (requires Java 17)
 ```
+
+To compile without running tests (e.g. when using Java 25): `mvn clean install -DskipTests`
 
 #### Python AI Service
 ```bash
@@ -306,7 +312,7 @@ Services are orchestrated with Docker Compose featuring:
 ### Python AI Service Endpoints (Direct - Internal Use)
 These endpoints are called by the Java service, not directly by the frontend:
 - `POST /ai/recommend` - Get recommendations (same as Java proxy)
-- `POST /ai/ingest` - Ingest single review into vector database
+- `POST /ai/ingest/` - Ingest single review into vector database
 - `POST /ai/ingest/batch` - Batch ingest multiple reviews
 - `GET /ai/health` - Health check with vector DB count
 
@@ -416,7 +422,7 @@ These endpoints are called by the Java service, not directly by the frontend:
 
 **Database Optimization**
 - Indexed foreign keys for fast joins
-- MyBatis-Plus for efficient SQL generation
+- Spring Data JPA with Hibernate for ORM
 - Connection pooling for reduced latency
 
 **AI Service Optimization**
@@ -461,8 +467,8 @@ Each service includes:
 ## Testing
 
 ### Test Coverage Summary
-- **Backend (Java):** 68 unit and integration tests
-- **Frontend (React):** 68 tests, 100% coverage on tested components
+- **Backend (Java):** 71 unit and integration tests
+- **Frontend (React):** 72 tests, 100% coverage on tested components
 - **Python (AI Service):** Health check and endpoint validation tests
 
 ### Testing Strategy
@@ -612,17 +618,14 @@ npm run preview
 ### Docker Compose (.env)
 ```env
 # MySQL Configuration
-MYSQL_ROOT_PASSWORD=your_password
+MYSQL_ROOT_PASSWORD=root123
 MYSQL_USER=teatime
-MYSQL_PASSWORD=your_password
+MYSQL_PASSWORD=teatime123
 
-# Redis Configuration  
-REDIS_PASSWORD=your_password
+# AI Service (required for start-all.sh)
+GOOGLE_API_KEY=your_gemini_api_key_here
 
-# AI Service
-GOOGLE_API_KEY=your_gemini_api_key
-
-# Service URLs (auto-configured in Docker)
+# Optional: Service URLs (auto-configured in Docker)
 JAVA_SERVICE_URL=http://java-service:8081
 PYTHON_SERVICE_URL=http://python-service:8000
 ```
@@ -684,13 +687,13 @@ teatime/
 │       │   │   ├── controller/
 │       │   │   ├── service/
 │       │   │   ├── entity/
-│       │   │   ├── mapper/
+│       │   │   ├── repository/
 │       │   │   ├── dto/
 │       │   │   ├── config/
 │       │   │   └── utils/
 │       │   └── resources/
 │       │       ├── application.yml
-│       │       └── mapper/
+│       │       └── flashSale.lua
 │       └── test/              # JUnit 5 tests
 │
 ├── python-service/            # FastAPI AI service
@@ -764,7 +767,7 @@ stream.orders                                 # Flash sale order queue
 - Password hashing with BCrypt
 - Token-based authentication with Redis
 - Input validation on all endpoints
-- SQL injection prevention via MyBatis parameter binding
+- SQL injection prevention via JPA parameter binding
 - XSS protection through content sanitization
 - CORS configuration for trusted origins
 - Rate limiting on authentication endpoints

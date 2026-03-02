@@ -2,13 +2,16 @@ package com.teatime.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.teatime.dto.Result;
+import com.teatime.dto.UserDTO;
 import com.teatime.entity.Blog;
 import com.teatime.service.IBlogService;
+import com.teatime.utils.UserHolder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -18,6 +21,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -126,5 +130,55 @@ class BlogControllerTest {
     mockMvc.perform(get("/api/blog/likes/{id}", blogId))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true));
+  }
+
+  /**
+   * Test 6: GET /api/blog/of/me - Query my blogs
+   */
+  @Test
+  void testQueryMyBlog_Success() throws Exception {
+    try (MockedStatic<UserHolder> userHolderMock = mockStatic(UserHolder.class)) {
+      UserDTO user = new UserDTO();
+      user.setId(1L);
+      userHolderMock.when(UserHolder::getUser).thenReturn(user);
+
+      List<Blog> blogs = Arrays.asList(new Blog(), new Blog());
+      when(blogService.queryBlogsByUserId(1L, 1)).thenReturn(blogs);
+
+      mockMvc.perform(get("/api/blog/of/me").param("current", "1"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.success").value(true))
+          .andExpect(jsonPath("$.data.length()").value(2));
+    }
+  }
+
+  /**
+   * Test 7: GET /api/blog - Query blogs by user ID
+   */
+  @Test
+  void testQueryBlogByUserId_Success() throws Exception {
+    List<Blog> blogs = Arrays.asList(new Blog(), new Blog());
+    when(blogService.queryBlogsByUserId(2L, 1)).thenReturn(blogs);
+
+    mockMvc.perform(get("/api/blog")
+            .param("id", "2")
+            .param("current", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.length()").value(2));
+  }
+
+  /**
+   * Test 8: GET /api/blog - Query blogs by user ID with default current
+   */
+  @Test
+  void testQueryBlogByUserId_DefaultCurrent() throws Exception {
+    List<Blog> blogs = Arrays.asList(new Blog());
+    when(blogService.queryBlogsByUserId(3L, 1)).thenReturn(blogs);
+
+    mockMvc.perform(get("/api/blog").param("id", "3"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.length()").value(1));
   }
 }

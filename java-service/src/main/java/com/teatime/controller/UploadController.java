@@ -5,6 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import com.teatime.dto.Result;
 import com.teatime.utils.SystemConstants;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -16,6 +17,14 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/upload")
 public class UploadController {
+
+  @Value("${teatime.upload.dir:}")
+  private String uploadDirOverride;
+
+  private String getImageUploadDir() {
+    return (uploadDirOverride != null && !uploadDirOverride.isEmpty())
+        ? uploadDirOverride : SystemConstants.IMAGE_UPLOAD_DIR;
+  }
 
   /**
    * Upload blog image
@@ -30,7 +39,7 @@ public class UploadController {
       // create new filename
       String fileName = createNewFileName(originalFilename);
       // save file to disk
-      image.transferTo(new File(SystemConstants.IMAGE_UPLOAD_DIR, fileName));
+      image.transferTo(new File(getImageUploadDir(), fileName));
       // return filename
       log.debug("successfully uploaded file: {}", fileName);
       return Result.ok(fileName);
@@ -45,7 +54,7 @@ public class UploadController {
    */
   @GetMapping("/blog/delete")
   public Result deleteBlogImg(@RequestParam("name") String filename) {
-    File file = new File(SystemConstants.IMAGE_UPLOAD_DIR, filename);
+    File file = new File(getImageUploadDir(), filename);
     if (file.isDirectory()) {
       return Result.fail("wrong file name");
     }
@@ -62,7 +71,7 @@ public class UploadController {
     int d1 = hash & 0xF;
     int d2 = (hash >> 4) & 0xF;
     // create directory if not exists
-    File dir = new File(SystemConstants.IMAGE_UPLOAD_DIR, StrUtil.format("/blogs/{}/{}", d1, d2));
+    File dir = new File(getImageUploadDir(), StrUtil.format("/blogs/{}/{}", d1, d2));
     if (!dir.exists()) {
       dir.mkdirs();
     }

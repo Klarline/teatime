@@ -18,6 +18,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -146,18 +147,52 @@ class ShopControllerTest {
   }
 
   /**
-   * Test 6: POST /api/shop - Save shop successfully
+   * Test 6: GET /api/shop/of/name - Query shops by name
+   */
+  @Test
+  void testQueryShopByName_Success() throws Exception {
+    List<Shop> shops = Arrays.asList(
+        createTestShop(1L, "Tea House"),
+        createTestShop(2L, "Tea Garden")
+    );
+    when(shopService.queryShopByName(eq("Tea"), eq(1)))
+        .thenReturn(Result.ok(shops));
+
+    mockMvc.perform(get("/api/shop/of/name")
+            .param("name", "Tea")
+            .param("current", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.length()").value(2))
+        .andExpect(jsonPath("$.data[0].name").value("Tea House"));
+  }
+
+  /**
+   * Test 7: GET /api/shop/of/name - Query with null/empty name and default current
+   */
+  @Test
+  void testQueryShopByName_OptionalParams() throws Exception {
+    List<Shop> shops = Arrays.asList(createTestShop(1L, "Shop"));
+    when(shopService.queryShopByName(isNull(), eq(1))).thenReturn(Result.ok(shops));
+
+    mockMvc.perform(get("/api/shop/of/name"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true));
+  }
+
+  /**
+   * Test 8: POST /api/shop - Save shop successfully
    */
   @Test
   void testSaveShop_Success() throws Exception {
     // Arrange
     Shop shop = createTestShop(null, "New Tea Shop");
 
-    when(shopService.save(any(Shop.class))).thenAnswer(invocation -> {
+    doAnswer(invocation -> {
       Shop savedShop = invocation.getArgument(0);
       savedShop.setId(1L);
-      return true;
-    });
+      return null;
+    }).when(shopService).save(any(Shop.class));
 
     // Act & Assert
     mockMvc.perform(post("/api/shop")

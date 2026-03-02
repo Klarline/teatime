@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.Arrays;
 
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -50,11 +51,11 @@ class CouponControllerTest {
     coupon.setTitle("50% Off");
     coupon.setStock(100);
 
-    when(couponService.save(any(Coupon.class))).thenAnswer(invocation -> {
+    doAnswer(invocation -> {
       Coupon c = invocation.getArgument(0);
       c.setId(1L);
-      return true;
-    });
+      return null;
+    }).when(couponService).save(any(Coupon.class));
 
     // Act & Assert
     mockMvc.perform(post("/api/coupon")

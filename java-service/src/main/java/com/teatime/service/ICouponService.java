@@ -1,6 +1,5 @@
 package com.teatime.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.teatime.dto.Result;
 import com.teatime.entity.Coupon;
 
@@ -9,20 +8,11 @@ import com.teatime.entity.Coupon;
  * Coupon service interface
  * </p>
  */
-public interface ICouponService extends IService<Coupon> {
+public interface ICouponService {
 
-  /**
-   * Query coupons available for a specific shop
-   *
-   * @param shopId Shop ID
-   * @return Result with coupon list
-   */
   Result queryCouponOfShop(Long shopId);
 
-  /**
-   * Add a flash sale coupon
-   *
-   * @param coupon Coupon object
-   */
   void addFlashSaleCoupon(Coupon coupon);
+
+  void save(Coupon coupon);
 }

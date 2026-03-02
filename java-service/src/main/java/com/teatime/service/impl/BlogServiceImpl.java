@@ -4,9 +4,6 @@ import static com.teatime.utils.RedisConstants.BLOG_LIKED_KEY;
 import static com.teatime.utils.RedisConstants.FEED_KEY;
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.util.StrUtil;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teatime.dto.Result;
 import com.teatime.dto.UserDTO;
 import com.teatime.dto.ai.ReviewDocument;
@@ -14,7 +11,7 @@ import com.teatime.entity.Blog;
 import com.teatime.entity.Follow;
 import com.teatime.entity.Shop;
 import com.teatime.entity.User;
-import com.teatime.mapper.BlogMapper;
+import com.teatime.repository.BlogRepository;
 import com.teatime.service.IAIService;
 import com.teatime.service.IBlogService;
 import com.teatime.service.IFollowService;
@@ -23,10 +20,13 @@ import com.teatime.service.IUserService;
 import com.teatime.utils.SystemConstants;
 import com.teatime.utils.UserHolder;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Resource;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -35,10 +35,12 @@ import org.springframework.stereotype.Service;
  * Blog service implementation
  * </p>
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
-public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IBlogService {
+public class BlogServiceImpl implements IBlogService {
 
+  private final BlogRepository blogRepository;
   private final IUserService userService;
   private final StringRedisTemplate stringRedisTemplate;
   private final IFollowService followService;
@@ -49,46 +51,26 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
   @Resource
   private IAIService aiService;
 
-  /**
-   * Query hot blogs
-   *
-   * @param current current page
-   * @return hot blogs
-   */
   @Override
   public Result queryHotBlog(Integer current) {
-    // query top liked blogs
-    Page<Blog> page = query()
-        .orderByDesc("liked")
-        .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
-    // get current page data
-    List<Blog> records = page.getRecords();
-    // query blog authors
+    List<Blog> records = blogRepository.findAllByOrderByLikedDesc(
+        PageRequest.of(current - 1, SystemConstants.MAX_PAGE_SIZE)
+    ).getContent();
+
     records.forEach(blog -> {
       queryBlogUser(blog);
-      // check if current user liked the blog
       isBlogLiked(blog);
     });
     return Result.ok(records);
   }
 
-  /**
-   * Query blog by id
-   *
-   * @param id blog id
-   * @return blog
-   */
   @Override
   public Result queryBlogById(Long id) {
-    // query blog
-    Blog blog = getById(id);
+    Blog blog = blogRepository.findById(id).orElse(null);
     if (blog == null) {
       return Result.fail("Blog does not exist");
     }
-    // query blog author
     queryBlogUser(blog);
-
-    // check if current user liked the blog
     isBlogLiked(blog);
     return Result.ok(blog);
   }
@@ -96,7 +78,6 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
   private void isBlogLiked(Blog blog) {
     UserDTO user = UserHolder.getUser();
     if (user == null) {
-      // if not logged in, cannot be liked
       return;
     }
     Long userId = user.getId();
@@ -105,30 +86,19 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     blog.setIsLike(score != null);
   }
 
-  /**
-   * Like or unlike a blog
-   *
-   * @param id blog id
-   * @return result
-   */
   @Override
   public Result likeBlog(Long id) {
     Long userId = UserHolder.getUser().getId();
-
-    // check if user has liked the blog
     String key = BLOG_LIKED_KEY + id;
     Double score = stringRedisTemplate.opsForZSet().score(key, userId.toString());
     if (score == null) {
-      boolean isSuccess = update().setSql("liked = liked + 1").eq("id", id).update();
-      if (isSuccess) {
-        // add user to liked set
+      int updated = blogRepository.incrementLiked(id);
+      if (updated > 0) {
         stringRedisTemplate.opsForZSet().add(key, userId.toString(), System.currentTimeMillis());
       }
     } else {
-      // unlike the blog
-      boolean isSuccess = update().setSql("liked = liked - 1").eq("id", id).update();
-      if (isSuccess) {
-        // remove user from liked set
+      int updated = blogRepository.decrementLiked(id);
+      if (updated > 0) {
         stringRedisTemplate.opsForZSet().remove(key, userId.toString());
       }
       return null;
@@ -136,12 +106,6 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     return Result.ok();
   }
 
-  /**
-   * Query top 5 users who liked the blog
-   *
-   * @param id blog id
-   * @return top 5 users
-   */
   @Override
   public Result queryBlogLikes(Long id) {
     String key = BLOG_LIKED_KEY + id;
@@ -152,34 +116,22 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     }
 
     List<Long> ids = top5.stream().map(Long::valueOf).toList();
-    String idStr = StrUtil.join(",", ids);
-    List<UserDTO> userDTOs =
-        userService.query()
-            .in("id", ids)
-            .last("ORDER BY FIELD(id," + idStr + ")").list()
-            .stream()
-            .map(user -> BeanUtil.copyProperties(user, UserDTO.class)).toList();
+    List<User> users = userService.listByIds(ids);
+    users.sort(Comparator.comparingInt(u -> ids.indexOf(u.getId())));
+    List<UserDTO> userDTOs = users.stream()
+        .map(user -> BeanUtil.copyProperties(user, UserDTO.class)).toList();
     return Result.ok(userDTOs);
   }
 
-  /**
-   * Save a new blog
-   *
-   * @param blog blog to save
-   * @return result
-   */
   @Override
   public Result saveBlog(Blog blog) {
-    // get logged-in user
     UserDTO user = UserHolder.getUser();
     blog.setUserId(user.getId());
-    // save blog to database
-    boolean isSuccess = save(blog);
-    if (!isSuccess) {
+    Blog saved = blogRepository.save(blog);
+    if (saved == null) {
       return Result.fail("Failed to publish blog");
     }
 
-    // async ingestion to AI service
     try {
       ReviewDocument review = new ReviewDocument();
       review.setReviewId(blog.getId());
@@ -187,7 +139,6 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
       review.setContent(blog.getContent());
       review.setTitle(blog.getTitle());
 
-      // get shop name and username
       Shop shop = shopService.getById(blog.getShopId());
       if (shop != null) {
         review.setShopName(shop.getName());
@@ -199,26 +150,36 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
       log.error("Failed to ingest review to AI service", e);
     }
 
-    // query followers of the author
-    List<Follow> follows = followService.query().eq("followed_user_id", user.getId()).list();
-
-    // push blog id to followers' feeds
+    List<Follow> follows = followService.findByFollowUserId(user.getId());
     for (Follow follow : follows) {
-      Long userId = follow.getUserId();
-      String key = FEED_KEY + userId;
+      Long followerId = follow.getUserId();
+      String feedKey = FEED_KEY + followerId;
       stringRedisTemplate.opsForZSet()
-          .add(key, blog.getId().toString(), System.currentTimeMillis());
+          .add(feedKey, blog.getId().toString(), System.currentTimeMillis());
     }
 
-    // return blog id
     return Result.ok(blog.getId());
   }
 
-  // query blog author information
+  @Override
+  public Blog getById(Long id) {
+    return blogRepository.findById(id).orElse(null);
+  }
+
+  @Override
+  public List<Blog> queryBlogsByUserId(Long userId, Integer current) {
+    return blogRepository.findByUserId(
+        userId,
+        PageRequest.of(current - 1, SystemConstants.MAX_PAGE_SIZE)
+    ).getContent();
+  }
+
   private void queryBlogUser(Blog blog) {
     Long userId = blog.getUserId();
     User user = userService.getById(userId);
-    blog.setName(user.getNickName());
-    blog.setIcon(user.getIcon());
+    if (user != null) {
+      blog.setName(user.getNickName());
+      blog.setIcon(user.getIcon());
+    }
   }
 }

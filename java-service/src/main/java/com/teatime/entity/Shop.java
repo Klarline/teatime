@@ -1,13 +1,10 @@
 package com.teatime.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 
+import javax.persistence.*;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
@@ -19,7 +16,8 @@ import java.time.LocalDateTime;
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("tb_shop")
+@Entity
+@Table(name = "tb_shop")
 public class Shop implements Serializable {
 
   private static final long serialVersionUID = 1L;
@@ -27,7 +25,8 @@ public class Shop implements Serializable {
   /**
    * Primary key ID
    */
-  @TableId(value = "id", type = IdType.AUTO)
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
   /**
@@ -103,6 +102,6 @@ public class Shop implements Serializable {
   /**
    * Distance from a certain point, not stored in database
    */
-  @TableField(exist = false)
+  @Transient
   private Double distance;
 }

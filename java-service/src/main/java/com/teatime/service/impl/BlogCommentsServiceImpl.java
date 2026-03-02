@@ -1,18 +1,30 @@
 package com.teatime.service.impl;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teatime.entity.BlogComments;
-import com.teatime.mapper.BlogCommentsMapper;
+import com.teatime.repository.BlogCommentsRepository;
 import com.teatime.service.IBlogCommentsService;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
+
 /**
  * <p>
- * Blog comments service implementation
+ * Blog Comments service implementation
  * </p>
  */
 @Service
-public class BlogCommentsServiceImpl extends ServiceImpl<BlogCommentsMapper, BlogComments>
-    implements IBlogCommentsService {
+public class BlogCommentsServiceImpl implements IBlogCommentsService {
 
+  @Resource
+  private BlogCommentsRepository blogCommentsRepository;
+
+  @Override
+  public BlogComments getById(Long id) {
+    return blogCommentsRepository.findById(id).orElse(null);
+  }
+
+  @Override
+  public BlogComments save(BlogComments blogComments) {
+    return blogCommentsRepository.save(blogComments);
+  }
 }

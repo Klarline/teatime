@@ -40,6 +40,7 @@ class CacheClientTest {
    * Test 1: query() - Cache hit returns cached data
    */
   @Test
+  @SuppressWarnings("unchecked")
   void testQuery_CacheHit_ReturnsData() {
     // Arrange
     Shop shop = createTestShop(1L, "Test Shop");
@@ -92,6 +93,7 @@ class CacheClientTest {
    * Test 3: queryWithPassThrough() - Cache hit returns cached data
    */
   @Test
+  @SuppressWarnings("unchecked")
   void testQueryWithPassThrough_CacheHit_ReturnsData() {
     // Arrange
     Shop shop = createTestShop(1L, "Test Shop");
@@ -162,6 +164,7 @@ class CacheClientTest {
    * Test 6: queryWithPassThrough() - Cached null value returns null immediately
    */
   @Test
+  @SuppressWarnings("unchecked")
   void testQueryWithPassThrough_CachedNullValue_ReturnsNull() {
     // Arrange
     String key = "cache:shop:999";
@@ -211,6 +214,7 @@ class CacheClientTest {
    * Test 8: queryWithLogicalExpire() - Valid cache returns data without database query
    */
   @Test
+  @SuppressWarnings("unchecked")
   void testQueryWithLogicalExpire_ValidCache_ReturnsData() {
     // Arrange
     String key = "cache:shop:1";
@@ -330,6 +334,7 @@ class CacheClientTest {
    * Test 12: queryWithMutex() - Cache hit returns data without locking
    */
   @Test
+  @SuppressWarnings("unchecked")
   void testQueryWithMutex_CacheHit_ReturnsData() {
     Shop shop = createTestShop(1L, "Test Shop");
     String key = "cache:shop:1";
@@ -359,7 +364,7 @@ class CacheClientTest {
     Shop shop = createTestShop(1L, "Test Shop");
 
     // First call returns null (cache miss), second call returns null (double-check)
-    when(valueOperations.get(key)).thenReturn(null, null);
+    when(valueOperations.get(key)).thenReturn((String) null, (String) null);
     when(valueOperations.setIfAbsent(lockKey, "1", 10L, TimeUnit.SECONDS))
         .thenReturn(true); // Successfully acquired lock
 
@@ -433,7 +438,7 @@ class CacheClientTest {
     String key = "cache:shop:999";
     String lockKey = "lock:cache:shop:999";
 
-    when(valueOperations.get(key)).thenReturn(null, null);
+    when(valueOperations.get(key)).thenReturn((String) null, (String) null);
     when(valueOperations.setIfAbsent(lockKey, "1", 10L, TimeUnit.SECONDS))
         .thenReturn(true); // Successfully gets lock
 

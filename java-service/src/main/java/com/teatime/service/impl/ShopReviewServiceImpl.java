@@ -1,21 +1,19 @@
 package com.teatime.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teatime.dto.Result;
 import com.teatime.dto.ai.ReviewDocument;
 import com.teatime.entity.Shop;
 import com.teatime.entity.ShopReview;
 import com.teatime.entity.User;
-import com.teatime.mapper.ShopMapper;
-import com.teatime.mapper.ShopReviewMapper;
-import com.teatime.mapper.UserMapper;
+import com.teatime.repository.ShopReviewRepository;
+import com.teatime.repository.UserRepository;
 import com.teatime.service.IAIService;
 import com.teatime.service.IShopReviewService;
 import com.teatime.service.IShopService;
 import com.teatime.utils.UserHolder;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -28,40 +26,27 @@ import java.util.stream.Collectors;
 /**
  * Shop Review Service Implementation
  */
+@Slf4j
 @Service
-public class ShopReviewServiceImpl extends ServiceImpl<ShopReviewMapper, ShopReview>
-    implements IShopReviewService {
+public class ShopReviewServiceImpl implements IShopReviewService {
 
   @Resource
-  private UserMapper userMapper;
+  private ShopReviewRepository shopReviewRepository;
 
   @Resource
-  private ShopMapper shopMapper;
-
-  @Resource
-  private IAIService aiService;
+  private UserRepository userRepository;
 
   @Resource
   private IShopService shopService;
 
-  /**
-   * Create a new shop review
-   *
-   * @param review ShopReview object containing review details
-   * @return Result indicating success or failure
-   */
+  @Resource
+  private IAIService aiService;
+
   @Override
   public Result createReview(ShopReview review) {
-    // Get current user
     Long userId = UserHolder.getUser().getId();
 
-    // Check if user already reviewed this shop
-    LambdaQueryWrapper<ShopReview> wrapper = new LambdaQueryWrapper<>();
-    wrapper.eq(ShopReview::getUserId, userId)
-        .eq(ShopReview::getShopId, review.getShopId());
-    Long count = baseMapper.selectCount(wrapper);
-
-    if (count > 0) {
+    if (shopReviewRepository.existsByUserIdAndShopId(userId, review.getShopId())) {
       return Result.fail("You have already reviewed this shop");
     }
 
@@ -69,36 +54,30 @@ public class ShopReviewServiceImpl extends ServiceImpl<ShopReviewMapper, ShopRev
       return Result.fail("Rating must be between 1 and 5");
     }
 
-    // Set user ID and timestamps
     review.setUserId(userId);
     review.setCreateTime(LocalDateTime.now());
     review.setUpdateTime(LocalDateTime.now());
 
-    boolean success = save(review);
-
-    if (!success) {
+    ShopReview saved = shopReviewRepository.save(review);
+    if (saved == null) {
       return Result.fail("Failed to create review");
     }
 
-    // Update shop rating and comment count
     updateShopRating(review.getShopId());
 
-    // Async ingestion to AI service
     try {
       ReviewDocument reviewDoc = new ReviewDocument();
       reviewDoc.setReviewId(review.getId());
       reviewDoc.setShopId(review.getShopId());
       reviewDoc.setContent(review.getContent());
-      reviewDoc.setTitle("Rating: " + review.getRating() + "/5"); // Include rating in title
+      reviewDoc.setTitle("Rating: " + review.getRating() + "/5");
 
-      // Get shop name
       Shop shop = shopService.getById(review.getShopId());
       if (shop != null) {
         reviewDoc.setShopName(shop.getName());
       }
 
-      // Get username
-      User user = userMapper.selectById(review.getUserId());
+      User user = userRepository.findById(review.getUserId()).orElse(null);
       if (user != null) {
         reviewDoc.setUserName(user.getNickName());
       }
@@ -111,32 +90,17 @@ public class ShopReviewServiceImpl extends ServiceImpl<ShopReviewMapper, ShopRev
     return Result.ok(review.getId());
   }
 
-  /**
-   * Get paginated reviews for a shop
-   *
-   * @param shopId  Shop ID
-   * @param current Current page number
-   * @param size    Number of reviews per page
-   * @return Result containing list of reviews
-   */
   @Override
   public Result getShopReviews(Long shopId, Integer current, Integer size) {
-    // Build query with pagination
-    LambdaQueryWrapper<ShopReview> wrapper = new LambdaQueryWrapper<>();
-    wrapper.eq(ShopReview::getShopId, shopId)
-        .orderByDesc(ShopReview::getCreateTime);
+    List<ShopReview> reviews = shopReviewRepository.findByShopIdOrderByCreateTimeDesc(
+        shopId,
+        PageRequest.of(current - 1, size)
+    ).getContent();
 
-    // Calculate offset
-    int offset = (current - 1) * size;
-    wrapper.last("LIMIT " + offset + ", " + size);
-
-    List<ShopReview> reviews = baseMapper.selectList(wrapper);
-
-    // Enrich with user information
     List<Map<String, Object>> enrichedReviews = reviews.stream().map(review -> {
       Map<String, Object> reviewMap = BeanUtil.beanToMap(review);
 
-      User user = userMapper.selectById(review.getUserId());
+      User user = userRepository.findById(review.getUserId()).orElse(null);
       if (user != null) {
         reviewMap.put("nickName", user.getNickName());
         reviewMap.put("icon", user.getIcon());
@@ -148,27 +112,15 @@ public class ShopReviewServiceImpl extends ServiceImpl<ShopReviewMapper, ShopRev
     return Result.ok(enrichedReviews);
   }
 
-  /**
-   * Get average rating and review count for a shop
-   *
-   * @param shopId Shop ID
-   * @return Result containing average rating and review count
-   */
   @Override
   public Result getShopRatingStats(Long shopId) {
-    // Get average rating using QueryWrapper
-    QueryWrapper<ShopReview> avgWrapper = new QueryWrapper<>();
-    avgWrapper.select("IFNULL(AVG(rating), 0) as avgRating, COUNT(*) as reviewCount")
-        .eq("shop_id", shopId);
+    Object[] stats = shopReviewRepository.findAvgRatingAndCountByShopId(shopId);
 
-    Map<String, Object> stats = baseMapper.selectMaps(avgWrapper).get(0);
-
-    // Handle BigDecimal from MySQL
-    Object avgRatingObj = stats.get("avgRating");
+    Object avgRatingObj = stats[0];
     double avgRating = avgRatingObj instanceof Number
         ? ((Number) avgRatingObj).doubleValue()
         : 0.0;
-    Long reviewCount = (Long) stats.get("reviewCount");
+    long reviewCount = (Long) stats[1];
 
     Map<String, Object> result = new HashMap<>();
     result.put("avgRating", Math.round(avgRating * 10.0) / 10.0);
@@ -177,38 +129,18 @@ public class ShopReviewServiceImpl extends ServiceImpl<ShopReviewMapper, ShopRev
     return Result.ok(result);
   }
 
-  /**
-   * Check if the current user has reviewed a specific shop
-   *
-   * @param shopId Shop ID
-   * @return Result indicating whether the user has reviewed the shop
-   */
   @Override
   public Result hasUserReviewed(Long shopId) {
     Long userId = UserHolder.getUser().getId();
-
-    LambdaQueryWrapper<ShopReview> wrapper = new LambdaQueryWrapper<>();
-    wrapper.eq(ShopReview::getUserId, userId)
-        .eq(ShopReview::getShopId, shopId);
-
-    Long count = baseMapper.selectCount(wrapper);
-
-    return Result.ok(count > 0);
+    boolean exists = shopReviewRepository.existsByUserIdAndShopId(userId, shopId);
+    return Result.ok(exists);
   }
 
-  /**
-   * Delete a shop review
-   *
-   * @param reviewId Review ID
-   * @return Result indicating success or failure
-   */
   @Override
   public Result deleteReview(Long reviewId) {
     Long userId = UserHolder.getUser().getId();
 
-    // Check if review exists and belongs to current user
-    ShopReview review = baseMapper.selectById(reviewId);
-
+    ShopReview review = shopReviewRepository.findById(reviewId).orElse(null);
     if (review == null) {
       return Result.fail("Review not found");
     }
@@ -217,49 +149,27 @@ public class ShopReviewServiceImpl extends ServiceImpl<ShopReviewMapper, ShopRev
       return Result.fail("You can only delete your own reviews");
     }
 
-    // Store shopId before deletion
     Long shopId = review.getShopId();
-
-    // Delete review
-    boolean success = removeById(reviewId);
-
-    if (!success) {
-      return Result.fail("Failed to delete review");
-    }
-
-    // Update shop rating and comment count
+    shopReviewRepository.deleteById(reviewId);
     updateShopRating(shopId);
 
     return Result.ok();
   }
 
-  /**
-   * Update shop's average rating and review count
-   *
-   * @param shopId Shop ID
-   */
   private void updateShopRating(Long shopId) {
-    // Get current stats
-    QueryWrapper<ShopReview> wrapper = new QueryWrapper<>();
-    wrapper.select("IFNULL(AVG(rating), 0) as avgRating, COUNT(*) as reviewCount")
-        .eq("shop_id", shopId);
+    Object[] stats = shopReviewRepository.findAvgRatingAndCountByShopId(shopId);
 
-    Map<String, Object> stats = baseMapper.selectMaps(wrapper).get(0);
-
-    // Handle BigDecimal from MySQL
-    Object avgRatingObj = stats.get("avgRating");
+    Object avgRatingObj = stats[0];
     double avgRating = avgRatingObj instanceof Number
         ? ((Number) avgRatingObj).doubleValue()
         : 0.0;
-    Long reviewCount = (Long) stats.get("reviewCount");
+    long reviewCount = (Long) stats[1];
 
-    // Update shop
-    Shop shop = shopMapper.selectById(shopId);
+    Shop shop = shopService.getById(shopId);
     if (shop != null) {
-      // Round to 1 decimal place
       shop.setScore((int) Math.round(avgRating * 10.0));
-      shop.setComments(reviewCount.intValue());
-      shopMapper.updateById(shop);
+      shop.setComments((int) reviewCount);
+      shopService.update(shop);
     }
   }
 }

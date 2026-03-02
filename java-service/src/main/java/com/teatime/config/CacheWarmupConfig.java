@@ -9,7 +9,6 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.geo.Point;
-import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import javax.annotation.Resource;
@@ -40,8 +39,6 @@ public class CacheWarmupConfig {
           return;
         }
 
-        int warmedCount = 0;
-
         for (Shop shop : shops) {
           // Warm up shop cache with logical expiration
           cacheClient.setLogicalExpire(
@@ -58,9 +55,8 @@ public class CacheWarmupConfig {
               new Point(shop.getX(), shop.getY()),
               shop.getId().toString()
           );
-
-          warmedCount++;
         }
+        log.info("Cache warmup completed for {} shops", shops.size());
       } catch (Exception e) {
         log.error("Cache pre-warming failed (application will continue): ", e);
       }

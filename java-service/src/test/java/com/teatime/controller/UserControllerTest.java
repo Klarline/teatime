@@ -241,4 +241,17 @@ class UserControllerTest {
         .andExpect(jsonPath("$.data.city").value("Vancouver"))
         .andExpect(jsonPath("$.data.bio").value("Tea enthusiast"));
   }
+
+  /**
+   * Test 12: GET /api/user/info/{id} - User info not found returns empty ok
+   */
+  @Test
+  void testInfo_NotFound_ReturnsEmptyOk() throws Exception {
+    Long userId = 999L;
+    when(userInfoService.getById(userId)).thenReturn(null);
+
+    mockMvc.perform(get("/api/user/info/{id}", userId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true));
+  }
 }

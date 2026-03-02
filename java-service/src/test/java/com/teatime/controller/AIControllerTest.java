@@ -1,7 +1,6 @@
 package com.teatime.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.teatime.dto.Result;
 import com.teatime.dto.ai.AIHealthResponse;
 import com.teatime.dto.ai.RecommendationRequest;
 import com.teatime.dto.ai.RecommendationResponse;

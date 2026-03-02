@@ -1,6 +1,5 @@
 package com.teatime.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.teatime.entity.BlogComments;
 
 /**
@@ -8,6 +7,9 @@ import com.teatime.entity.BlogComments;
  * Blog Comments service interface
  * </p>
  */
-public interface IBlogCommentsService extends IService<BlogComments> {
+public interface IBlogCommentsService {
 
+  BlogComments getById(Long id);
+
+  BlogComments save(BlogComments blogComments);
 }

@@ -20,8 +20,14 @@ spring:
         time-between-eviction-runs: 10s
   jackson:
     default-property-inclusion: non_null
-mybatis-plus:
-  type-aliases-package: com.teatime.entity
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
 logging:
   level:
     com.teatime: debug

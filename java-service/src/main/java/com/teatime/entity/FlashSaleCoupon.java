@@ -1,12 +1,10 @@
 package com.teatime.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 
+import javax.persistence.*;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
@@ -19,7 +17,8 @@ import java.time.LocalDateTime;
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("tb_flash_sale_coupon")
+@Entity
+@Table(name = "tb_flash_sale_coupon")
 public class FlashSaleCoupon implements Serializable {
 
   private static final long serialVersionUID = 1L;
@@ -27,7 +26,8 @@ public class FlashSaleCoupon implements Serializable {
   /**
    * Coupon ID
    */
-  @TableId(value = "coupon_id", type = IdType.INPUT)
+  @Id
+  @Column(name = "coupon_id")
   private Long couponId;
 
   /**

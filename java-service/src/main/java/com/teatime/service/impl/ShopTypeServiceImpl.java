@@ -4,14 +4,13 @@ import static com.teatime.utils.RedisConstants.CACHE_SHOP_TYPE_KEY;
 
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teatime.dto.Result;
 import com.teatime.entity.ShopType;
-import com.teatime.mapper.ShopTypeMapper;
+import com.teatime.repository.ShopTypeRepository;
 import com.teatime.service.IShopTypeService;
 import java.util.List;
 import javax.annotation.Resource;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 /**
@@ -20,17 +19,14 @@ import org.springframework.stereotype.Service;
  * </p>
  */
 @Service
-public class ShopTypeServiceImpl extends ServiceImpl<ShopTypeMapper, ShopType>
-    implements IShopTypeService {
+public class ShopTypeServiceImpl implements IShopTypeService {
 
   @Resource
-  StringRedisTemplate stringRedisTemplate;
+  private ShopTypeRepository shopTypeRepository;
 
-  /**
-   * Query the list of shop types
-   *
-   * @return Result containing the list of shop types
-   */
+  @Resource
+  private org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
+
   @Override
   public Result queryTypeList() {
     String key = CACHE_SHOP_TYPE_KEY;
@@ -41,7 +37,7 @@ public class ShopTypeServiceImpl extends ServiceImpl<ShopTypeMapper, ShopType>
       return Result.ok(typeList);
     }
 
-    List<ShopType> typeList = query().orderByAsc("sort").list();
+    List<ShopType> typeList = shopTypeRepository.findAll(Sort.by(Sort.Direction.ASC, "sort"));
     stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(typeList));
 
     return Result.ok(typeList);

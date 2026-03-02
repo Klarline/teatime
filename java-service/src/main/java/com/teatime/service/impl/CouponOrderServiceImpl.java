@@ -1,10 +1,9 @@
 package com.teatime.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.teatime.dto.Result;
 import com.teatime.entity.CouponOrder;
-import com.teatime.mapper.CouponOrderMapper;
+import com.teatime.repository.CouponOrderRepository;
 import com.teatime.service.IFlashSaleCouponService;
 import com.teatime.service.ICouponOrderService;
 import com.teatime.utils.RedisIdGenerator;
@@ -36,13 +35,11 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>
  * Coupon order service implementation
  * </p>
- *
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class CouponOrderServiceImpl extends ServiceImpl<CouponOrderMapper, CouponOrder>
-    implements ICouponOrderService {
+public class CouponOrderServiceImpl implements ICouponOrderService {
 
   private static final DefaultRedisScript<Long> FLASH_SALE_SCRIPT;
   private static final ExecutorService FLASH_SALE_ORDER_EXECUTOR =
@@ -54,6 +51,7 @@ public class CouponOrderServiceImpl extends ServiceImpl<CouponOrderMapper, Coupo
     FLASH_SALE_SCRIPT.setResultType(Long.class);
   }
 
+  private final CouponOrderRepository couponOrderRepository;
   private final IFlashSaleCouponService flashSaleCouponService;
   private final RedisIdGenerator redisIdGenerator;
   private final RedissonClient redissonClient;
@@ -61,40 +59,29 @@ public class CouponOrderServiceImpl extends ServiceImpl<CouponOrderMapper, Coupo
   private ICouponOrderService proxy;
 
   @PostConstruct
-public void init() {
-    // Initialize stream handler asynchronously to not block application startup
+  public void init() {
     FLASH_SALE_ORDER_EXECUTOR.submit(() -> {
+      try {
         try {
-            // Create consumer group if it doesn't exist
-            try {
-                stringRedisTemplate.opsForStream()
-                    .createGroup("stream.orders", "g1");
-                log.info("Created Redis Stream consumer group 'g1' for 'stream.orders'");
-            } catch (Exception e) {
-                log.info("Consumer group 'g1' already exists or will be created on first message");
-            }
-            
-            // Start processing orders
-            new CouponOrderHandler().run();
+          stringRedisTemplate.opsForStream()
+              .createGroup("stream.orders", "g1");
+          log.info("Created Redis Stream consumer group 'g1' for 'stream.orders'");
         } catch (Exception e) {
-            log.error("Error initializing coupon order handler: {}", e.getMessage());
+          log.info("Consumer group 'g1' already exists or will be created on first message");
         }
-    });
-}
 
-  /**
-   * Handle flash sale coupon purchase request
-   *
-   * @param couponId the coupon id
-   * @return Result containing order id or error message
-   */
+        new CouponOrderHandler().run();
+      } catch (Exception e) {
+        log.error("Error initializing coupon order handler: {}", e.getMessage());
+      }
+    });
+  }
+
   @Override
   public Result flashSaleCoupon(Long couponId) {
     Long userId = UserHolder.getUser().getId();
-    // generate order id
     long orderId = redisIdGenerator.nextId("order");
 
-    // check flash sale conditions, deduct stock and  send order to queue atomically using Lua script
     Long result =
         stringRedisTemplate.execute(FLASH_SALE_SCRIPT, Collections.emptyList(),
             String.valueOf(couponId),
@@ -109,20 +96,16 @@ public void init() {
       };
     }
 
-
-    // get proxy object to call transactional method
     proxy = (ICouponOrderService) AopContext.currentProxy();
 
     return Result.ok(orderId);
   }
 
-  // process coupon order
   private void handleCouponOrder(CouponOrder couponOrder) {
     Long userId = couponOrder.getUserId();
     RLock lock = redissonClient.getLock("lock:order:" + userId);
     boolean isLock = lock.tryLock();
     if (!isLock) {
-      // failed to acquire lock, log error
       log.error("Duplicate order attempt for user {}", userId);
       return;
     }
@@ -133,65 +116,49 @@ public void init() {
     }
   }
 
-  /**
-   * Create coupon order with transactional support
-   *
-   * @param couponOrder the coupon order
-   */
+  @Override
   @Transactional
   public void createCouponOrder(CouponOrder couponOrder) {
-    // check if user has already purchased
     Long userId = couponOrder.getUserId();
-    Long count =
-        query().eq("user_id", userId).eq("coupon_id", couponOrder.getCouponId()).count();
+    long count = couponOrderRepository.countByUserIdAndCouponId(userId, couponOrder.getCouponId());
     if (count > 0) {
       log.error("User {} has already purchased coupon {}", userId,
           couponOrder.getCouponId());
       return;
     }
-    // deduct stock
-    boolean success = flashSaleCouponService.update().setSql("stock = stock - 1")
-        .eq("coupon_id", couponOrder.getCouponId()).gt("stock", 0).update();
+
+    boolean success = flashSaleCouponService.decrementStock(couponOrder.getCouponId());
     if (!success) {
       log.error("Insufficient stock for coupon");
       return;
     }
 
-    // save order
-    this.save(couponOrder);
+    couponOrderRepository.save(couponOrder);
   }
 
-  // background handler for processing coupon orders from Redis stream
   private class CouponOrderHandler implements Runnable {
     String queueName = "stream.orders";
 
-    /**
-     * Run the coupon order handler
-     */
     @Override
+    @SuppressWarnings("unchecked")
     public void run() {
       while (true) {
         try {
-          // read order from stream
           List<MapRecord<String, Object, Object>> list = stringRedisTemplate.opsForStream().read(
               Consumer.from("g1", "c1"),
               StreamReadOptions.empty().count(1).block(Duration.ofSeconds(2)),
               StreamOffset.create(queueName, ReadOffset.lastConsumed())
           );
 
-          // if no new orders, continue
           if (list == null || list.isEmpty()) {
-            // no new orders, continue
             continue;
           }
 
-          // process order
           MapRecord<String, Object, Object> record = list.get(0);
           Map<Object, Object> values = record.getValue();
           CouponOrder couponOrder = BeanUtil.fillBeanWithMap(values, new CouponOrder(), true);
           handleCouponOrder(couponOrder);
 
-          // acknowledge message
           stringRedisTemplate.opsForStream().acknowledge(queueName, "g1", record.getId());
         } catch (Exception e) {
           log.error("Error processing coupon order", e);
@@ -200,34 +167,30 @@ public void init() {
       }
     }
 
-    // handle pending list for unacknowledged messages
+    @SuppressWarnings("unchecked")
     private void handlePendingList() {
       while (true) {
         try {
-          // read order from pending list
           List<MapRecord<String, Object, Object>> list = stringRedisTemplate.opsForStream().read(
               Consumer.from("g1", "c1"),
               StreamReadOptions.empty().count(1),
               StreamOffset.create(queueName, ReadOffset.from("0"))
           );
 
-          // if no pending orders, break
           if (list == null || list.isEmpty()) {
             break;
           }
 
-          // process order
           MapRecord<String, Object, Object> record = list.get(0);
           Map<Object, Object> values = record.getValue();
           CouponOrder couponOrder = BeanUtil.fillBeanWithMap(values, new CouponOrder(), true);
           handleCouponOrder(couponOrder);
 
-          // acknowledge message
           stringRedisTemplate.opsForStream().acknowledge(queueName, "g1", record.getId());
         } catch (Exception e) {
           log.error("Error processing pending coupon order", e);
           try {
-            Thread.sleep(20); // wait before retrying
+            Thread.sleep(20);
           } catch (InterruptedException ex) {
             ex.printStackTrace();
           }

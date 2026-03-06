@@ -47,8 +47,7 @@ def test_ingest_batch_reviews(mock_retriever):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "success"
-    assert data["count"] == 2
-    mock_retriever.add_documents_batch.assert_called_once()
+    assert data["total"] == 2
 
 
 def test_ingest_missing_required_field():

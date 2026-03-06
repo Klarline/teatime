@@ -29,7 +29,8 @@ def mock_pipeline():
         pipeline = MagicMock()
         pipeline.recommend.return_value = (
             "I recommend Downtown Cafe for great tea and Tea House for cozy atmosphere.",
-            [1, 2]
+            [1, 2],
+            {"overall_grade": "PASS", "retrieval": {"avg_similarity": 0.85, "num_after_filtering": 2, "num_retrieved": 2}, "response": {"faithfulness_score": 0.90}}
         )
         mock.return_value = pipeline
         yield pipeline

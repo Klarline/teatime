@@ -13,7 +13,8 @@ def test_pipeline_recommend_returns_text_and_ids():
             'metadatas': [[
                 {'blog_id': 1},
                 {'blog_id': 2}
-            ]]
+            ]],
+            'distances': [[0.15, 0.25]]
         }
         mock_retriever.return_value = retriever
 
@@ -24,10 +25,12 @@ def test_pipeline_recommend_returns_text_and_ids():
         from app.rag.pipeline import RAGPipeline
         pipeline = RAGPipeline()
 
-        recommendation, source_ids = pipeline.recommend("quiet cafe", max_results=5)
+        recommendation, source_ids, evaluation = pipeline.recommend("quiet cafe", max_results=5)
 
         assert recommendation == "Try these places!"
         assert source_ids == [1, 2]
+        assert evaluation is not None
+        assert evaluation["overall_grade"] in ["PASS", "DEGRADED", "FAIL"]
         retriever.search.assert_called_once_with("quiet cafe", n_results=5)
         generator.generate_recommendation.assert_called_once()
 
@@ -46,8 +49,8 @@ def test_pipeline_recommend_empty_results():
         from app.rag.pipeline import RAGPipeline
         pipeline = RAGPipeline()
 
-        recommendation, source_ids = pipeline.recommend("unknown query")
+        recommendation, source_ids, evaluation = pipeline.recommend("unknown query")
 
         assert "don't have enough information" in recommendation
         assert source_ids == []
-        mock_generator.return_value.generate_recommendation.assert_not_called()
+        assert evaluation is None

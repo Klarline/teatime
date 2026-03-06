@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
-from app.api import recommend, ingest
+from app.api import recommend, ingest, evaluate
 
 settings = get_settings()
 
@@ -18,6 +18,7 @@ app.add_middleware(
 # Include routers
 app.include_router(recommend.router)
 app.include_router(ingest.router)
+app.include_router(evaluate.router)
 
 @app.get("/")
 async def root():

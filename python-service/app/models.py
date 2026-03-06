@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 class ReviewDocument(BaseModel):
     blog_id: int
@@ -16,6 +16,7 @@ class RecommendationRequest(BaseModel):
 class RecommendationResponse(BaseModel):
     recommendations: str
     source_blogs: List[int]
+    quality: Optional[Dict] = None
 
 class HealthResponse(BaseModel):
     status: str

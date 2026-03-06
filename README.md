@@ -20,7 +20,7 @@ TeaTime is a microservices-based web application that enables users to discover 
 - **Cache Layer:** Redis 7.x
 - **ORM:** Hibernate (Spring Data JPA)
 - **Build Tool:** Maven 3.6+
-- **Key Libraries:** Redisson (distributed locks), Hutool, Lombok, Spring Boot Actuator
+- **Key Libraries:** Redisson (distributed locks), Apache Commons Lang, Jackson, Lombok, Spring Boot Actuator
 
 ### AI Service (Python)
 - **Framework:** FastAPI 0.109.0
